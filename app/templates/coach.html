@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} 맞춤 코칭 - JobFit{% endblock %}
+{% block content %}
+<a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
+<h1>{{ job.title }} 맞춤 이력서 코칭</h1>
+<p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})</p>
+
+<div class="card">
+  <h3>매칭 점수</h3>
+  <div class="bar-track"><div class="bar-fill" style="width: {{ coaching.match.score }}%;"></div></div>
+  {{ coaching.match.score }}점
+</div>
+
+<div class="card">
+  <h3>부족한 스킬 (카테고리별)</h3>
+  {% if not coaching.category_gaps %}
+  <p class="ok-text">부족한 스킬이 없습니다.</p>
+  {% endif %}
+  {% for g in coaching.category_gaps %}
+  <div class="category-gap">
+    <h4>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h4>
+    <div class="tags">
+      {% for s in g.required_missing %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
+      {% for s in g.preferred_missing %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h3>이력서 보완 가이드</h3>
+  <ul class="suggestion-list">
+    {% for s in coaching.suggestions %}
+    <li class="suggestion suggestion-{{ 'ok' if s.status == 'ok' else ('warning' if s.status == 'warning' else 'info') }}">
+      <span class="badge">{{ "✓" if s.status == "ok" else ("!" if s.status == "warning" else "i") }}</span>
+      <div>
+        <strong>{{ s.title }}</strong>
+        <p>{{ s.detail }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+<details class="card">
+  <summary><h3 style="display:inline">일반 이력서 체크리스트</h3></summary>
+  <ul class="suggestion-list">
+    {% for s in generic_suggestions %}
+    <li class="suggestion suggestion-{{ s.status }}">
+      <span class="badge">{{ "✓" if s.status == "ok" else "!" }}</span>
+      <div>
+        <strong>{{ s.title }}</strong>
+        <p>{{ s.detail }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endblock %}

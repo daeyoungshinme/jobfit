@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}스킬 통계 - JobFit{% endblock %}
+{% block content %}
+<div class="tabs" role="tablist" aria-label="분석 보기 전환">
+  <a role="tab" aria-selected="false" class="tab-btn" href="/analysis/dashboard">매칭 대시보드</a>
+  <a role="tab" aria-selected="true" class="tab-btn active" href="/analysis/skills">스킬 통계</a>
+</div>
+<h1>직무별 요구 스킬 통계</h1>
+<p class="hint">등록된 채용공고를 직무 기준으로 집계해 가장 많이 요구되는 스킬을 보여줍니다. 이직 준비 시 우선적으로 갖춰야 할 스킬을 파악하는 데 활용하세요.</p>
+
+<form method="get" action="/analysis/skills" class="card filter-bar">
+  <label>직무
+    <select name="position" onchange="this.form.submit()">
+      <option value="">전체</option>
+      {% for p in positions %}
+      <option value="{{ p }}" {% if selected_position == p %}selected{% endif %}>{{ p }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<p class="meta">분석 대상 공고: {{ job_count }}건</p>
+
+{% if not ranking %}
+<p class="empty-state">분석할 채용공고가 없습니다. <a href="/jobs/new">채용공고를 등록</a>해 보세요.</p>
+{% else %}
+<p class="hint">{{ job_count }}개 공고 중 가장 많이 요구되는 스킬은 <strong>{{ ranking[0].name }}</strong>({{ ranking[0].percentage }}%)입니다.</p>
+<div class="table-scroll">
+<table class="data-table">
+  <thead>
+    <tr><th>순위</th><th>스킬</th><th>필수 언급</th><th>우대 언급</th><th>등장 비율</th></tr>
+  </thead>
+  <tbody>
+    {% for r in ranking %}
+    <tr {% if loop.first %}class="row-highlight"{% endif %}>
+      <td data-label="순위">{{ loop.index }}</td>
+      <td data-label="스킬">{{ r.name }}</td>
+      <td data-label="필수 언급">{{ r.required_count }}건</td>
+      <td data-label="우대 언급">{{ r.preferred_count }}건</td>
+      <td data-label="등장 비율">
+        <div class="bar-track"><div class="bar-fill" style="width: {{ r.percentage }}%;"></div></div>
+        {{ r.percentage }}% ({{ job_count }}건 중)
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}이력서 등록 - JobFit{% endblock %}
+{% block content %}
+{% set errors = errors or {} %}
+{% set values = values or {} %}
+{% set active_tab = active_tab or "file-tab" %}
+<h1>이력서 등록</h1>
+
+{% if errors %}<div class="form-error-banner" role="alert">입력값을 확인해주세요.</div>{% endif %}
+
+<div class="tabs" role="tablist" aria-label="이력서 등록 방식">
+  <button type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'file-tab' else 'false' }}" aria-controls="file-tab" id="file-tab-btn" class="tab-btn {{ 'active' if active_tab == 'file-tab' }}" data-tab="file-tab">파일 업로드 (PDF/DOCX)</button>
+  <button type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'form-tab' else 'false' }}" aria-controls="form-tab" id="form-tab-btn" class="tab-btn {{ 'active' if active_tab == 'form-tab' }}" data-tab="form-tab">직접 입력</button>
+</div>
+
+<div id="file-tab" class="tab-panel {{ 'active' if active_tab == 'file-tab' }}" role="tabpanel" aria-labelledby="file-tab-btn">
+  <form method="post" action="/resumes/upload" enctype="multipart/form-data" class="card form-card">
+    <label>이력서 이름
+      <input type="text" name="label" required placeholder="예: 2026년 8월 버전" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}">
+      {% if errors.label %}<span class="field-error-text">{{ errors.label }}</span>{% endif %}
+    </label>
+    <label>파일 (PDF, DOCX, TXT)
+      <input type="file" name="file" accept=".pdf,.docx,.txt" required class="{{ 'field-error' if errors.file }}">
+      {% if errors.file %}<span class="field-error-text">{{ errors.file }}</span>{% endif %}
+    </label>
+    <button type="submit" class="btn-primary">업로드</button>
+  </form>
+</div>
+
+<div id="form-tab" class="tab-panel {{ 'active' if active_tab == 'form-tab' }}" role="tabpanel" aria-labelledby="form-tab-btn">
+  <form method="post" action="/resumes/form">
+    <div class="card form-card">
+      <h3>기본 정보</h3>
+      <label>이력서 이름
+        <input type="text" name="label" required placeholder="예: 백엔드 지원용" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}">
+        {% if errors.label %}<span class="field-error-text">{{ errors.label }}</span>{% endif %}
+      </label>
+    </div>
+    <div class="card form-card">
+      <h3>상세 내용</h3>
+      <label>경력/경험
+        <textarea name="career" rows="5" placeholder="회사, 기간, 담당 업무와 성과를 적어주세요">{{ values.career or '' }}</textarea>
+      </label>
+      <label>프로젝트
+        <textarea name="projects" rows="5" placeholder="프로젝트명, 역할, 사용 기술, 성과를 적어주세요">{{ values.projects or '' }}</textarea>
+      </label>
+      <label>학력
+        <textarea name="education" rows="3" placeholder="학교, 전공, 졸업연도">{{ values.education or '' }}</textarea>
+      </label>
+      <label>보유 기술 스킬 (쉼표로 구분)
+        <input type="text" name="skills_text" placeholder="예: Python, FastAPI, PostgreSQL, Docker" value="{{ values.skills_text or '' }}">
+      </label>
+      <button type="submit" class="btn-primary">저장</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

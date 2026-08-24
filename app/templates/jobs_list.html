@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}채용공고 목록 - JobFit{% endblock %}
+{% block content %}
+<h1>채용공고 목록 {% if active_filter_count %}<span class="tag tag-source">{{ active_filter_count }}개 필터 적용됨</span>{% endif %}</h1>
+
+<form method="get" action="/jobs" class="card filter-bar">
+  <details class="filter-group" {% if filters.position %}open{% endif %}>
+    <summary>직무{% if filters.position %} ({{ filters.position|length }}){% endif %}</summary>
+    <div class="checkbox-list">
+      {% for p in positions %}
+      <label class="checkbox-item">
+        <input type="checkbox" name="position" value="{{ p }}" {% if p in filters.position %}checked{% endif %}>
+        {{ p }}
+      </label>
+      {% endfor %}
+    </div>
+  </details>
+  <details class="filter-group" {% if filters.experience_level %}open{% endif %}>
+    <summary>경력{% if filters.experience_level %} ({{ filters.experience_level|length }}){% endif %}</summary>
+    <div class="checkbox-list">
+      {% for e in experience_levels %}
+      <label class="checkbox-item">
+        <input type="checkbox" name="experience_level" value="{{ e }}" {% if e in filters.experience_level %}checked{% endif %}>
+        {{ e }}
+      </label>
+      {% endfor %}
+    </div>
+  </details>
+  <details class="filter-group" {% if filters.region %}open{% endif %}>
+    <summary>지역{% if filters.region %} ({{ filters.region|length }}){% endif %}</summary>
+    <div class="checkbox-list">
+      {% for r in regions %}
+      <label class="checkbox-item">
+        <input type="checkbox" name="region" value="{{ r }}" {% if r in filters.region %}checked{% endif %}>
+        {{ r }}
+      </label>
+      {% endfor %}
+    </div>
+  </details>
+  <details class="filter-group" {% if filters.skill %}open{% endif %}>
+    <summary>기술 스킬{% if filters.skill %} ({{ filters.skill|length }}){% endif %}</summary>
+    <div class="checkbox-list">
+      {% for s in all_skills %}
+      <label class="checkbox-item">
+        <input type="checkbox" name="skill" value="{{ s }}" {% if s in filters.skill %}checked{% endif %}>
+        {{ s }}
+      </label>
+      {% endfor %}
+    </div>
+  </details>
+  <div class="filter-actions">
+    <button type="submit" class="btn-secondary">필터 적용</button>
+    <a href="/jobs" class="btn-secondary">필터 초기화</a>
+  </div>
+</form>
+
+{% if not jobs %}
+<p class="empty-state">등록된 채용공고가 없습니다. <a href="/jobs/new">지금 등록하기</a></p>
+{% elif jobs|length > 50 %}
+<p class="hint">총 {{ jobs|length }}건 중 전체를 표시 중입니다. 필터를 사용해 좁혀보세요.</p>
+{% endif %}
+
+<div class="card-grid">
+  {% for job in jobs %}
+  <a href="/jobs/{{ job.id }}" class="card job-card">
+    <h3>{{ job.title }}</h3>
+    <p class="meta">{{ job.company }} · {{ job.position }} {% if job.experience_level %}· {{ job.experience_level }}{% endif %}
+      {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
+    </p>
+    <div class="tags">
+      {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
+      {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

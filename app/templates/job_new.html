@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}채용공고 등록 - JobFit{% endblock %}
+{% block content %}
+{% from "_job_form.html" import job_form %}
+<h1>채용공고 등록</h1>
+{{ job_form(mode="new", action="/jobs", submit_label="저장", positions=positions, experience_levels=experience_levels, values=values, errors=errors) }}
+{% endblock %}

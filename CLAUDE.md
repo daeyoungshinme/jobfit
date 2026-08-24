@@ -1,0 +1,44 @@
+# CLAUDE.md
+
+JobFit — 채용공고/이력서 분석 도구 (FastAPI + SQLite, 서버사이드 렌더링). 사용자 대상 설명(왜 수동 입력인지, 복사 잠금 해제 도구, OCR 사전 설치 등)은 [README.md](README.md)를 참고하세요. 이 파일은 코드를 다룰 때 필요한 실무 정보에 집중합니다.
+
+## 실행 / 테스트
+
+```bash
+uvicorn app.main:app --reload --port 8100   # 또는 ./dev.sh (Git Bash, 기존 서버 정리 후 재기동)
+pytest                                       # tests/
+```
+
+데이터는 프로젝트 루트의 `jobfit.db` (SQLite)에 저장됩니다. 외부 AI API는 사용하지 않으며, 스킬 추출/매칭은 전부 정규식·사전 기반 규칙 매칭입니다. OCR([app/services/ocr.py](app/services/ocr.py))만 예외적으로 로컬에 설치된 Tesseract-OCR 바이너리를 호출하지만, 이 역시 외부 서비스 호출이 아닙니다.
+
+테스트는 `tests/conftest.py`의 `db_session`/`client` 픽스처가 in-memory SQLite로 `get_db`를 오버라이드해서 돕니다 — 실제 `jobfit.db`를 건드리지 않으므로, 라우터 테스트를 추가할 때는 이 픽스처를 그대로 재사용하세요.
+
+## 아키텍처
+
+요청 흐름: `routers` → `services` → `models`. 템플릿은 [app/templates.py](app/templates.py)의 단일 `Jinja2Templates` 인스턴스를 모든 라우터가 `from app.templates import templates`로 가져다 쓰는 공유 구조이며, 여기에 `bulleted` 커스텀 필터와 `flash_messages` 전역이 등록되어 있습니다.
+
+- [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, startup 시 `init_db()` 호출.
+- [app/templates.py](app/templates.py) — 공유 `Jinja2Templates` 인스턴스, `bulleted` 필터·`flash_messages` 전역 등록.
+- [app/routers/jobs.py](app/routers/jobs.py) — 채용공고 CRUD, 스킬 미리보기, OCR 업로드, 출처 사이트(source_site) 추측.
+- [app/routers/resumes.py](app/routers/resumes.py) — 이력서 업로드(PDF/DOCX/TXT)/폼 등록.
+- [app/routers/analysis.py](app/routers/analysis.py) — 스킬 통계, 매칭 대시보드.
+- [app/services/job_parser.py](app/services/job_parser.py) — 정규식 기반 채용공고 섹션 분리(주요업무/자격요건/우대사항/복지 등).
+- [app/services/skill_extractor.py](app/services/skill_extractor.py) — `app/data/skills_dictionary.json` 사전 기반 스킬 추출. `term_pattern()`이 스크립트별 단어 경계 규칙을 제공(아래 컨벤션 참고).
+- [app/services/matcher.py](app/services/matcher.py) — 이력서-공고 매칭 점수 계산. 가중치(`MATCH_REQUIRED_WEIGHT=0.7`, `MATCH_PREFERRED_WEIGHT=0.3`)는 [app/constants.py](app/constants.py)에 정의.
+- [app/services/resume_parser.py](app/services/resume_parser.py) / [resume_reviewer.py](app/services/resume_reviewer.py) — 이력서 텍스트 추출 / 규칙 기반 개선 제안.
+- [app/services/ocr.py](app/services/ocr.py) — 캡처 이미지 OCR. `pytesseract` + 로컬 Tesseract-OCR 바이너리 호출, PATH에 없으면 Windows 기본 설치 경로를 자동 탐색하고 실패 시 한국어 안내 메시지로 `RuntimeError`를 던짐.
+- [app/services/text_formatter.py](app/services/text_formatter.py) — 원문 텍스트를 글머리 기호/괄호 소제목 기준으로 escape된 HTML로 렌더링 (`bulleted` 필터의 구현체).
+- [app/services/validation.py](app/services/validation.py) — `require_fields()`로 폼 필수값 검증. 라우터들이 공통으로 재사용.
+- [app/models.py](app/models.py) — SQLAlchemy 모델 (`JobPosting`, `Resume`).
+- [app/db.py](app/db.py) — SQLite 엔진/세션, 테이블 컬럼 마이그레이션(`_migrate_table_columns()`, 현재 `JobPosting`에 적용 중).
+- [app/schemas.py](app/schemas.py) — Pydantic 응답 스키마.
+- [app/constants.py](app/constants.py) — 직무/경력/지역 목록, flash 메시지.
+- [app/data/skills_dictionary.json](app/data/skills_dictionary.json) — 카테고리별 스킬명+동의어 사전 (커스터마이징 가능).
+- [tools/copy_unlock/](tools/copy_unlock/) — 브라우저 전용 북마클릿/유저스크립트, 서버 코드와 무관.
+
+## 주의할 컨벤션
+
+- **DB 마이그레이션**: 전용 마이그레이션 도구가 없습니다. [app/db.py](app/db.py)의 `_migrate_table_columns(table_name, columns)`가 테이블 무관 범용 헬퍼입니다 — `JobPosting`에 컬럼을 추가할 때는 `_JOB_POSTING_NEW_COLUMNS`에 `(컬럼명, DDL타입, 기본값 리터럴)`을 추가하면 `init_db()`가 이를 `_migrate_table_columns("job_postings", _JOB_POSTING_NEW_COLUMNS)`로 호출해 누락된 컬럼을 `ALTER TABLE`로 추가하고, 새로 추가된 경우(기존 DB 업그레이드일 때만)에 한해 `_backfill_job_postings()`가 기존 행을 재파싱해 채웁니다. `Resume`은 아직 이 메커니즘을 쓰지 않으므로, 컬럼을 추가한다면 같은 이름 패턴(`_RESUME_NEW_COLUMNS` 등)으로 `_migrate_table_columns("resumes", ...)`를 호출하고 필요 시 전용 백필 함수를 추가하세요.
+- **스크립트 인식 단어 경계**: 한글은 조사가 단어에 바로 붙기 때문에, `skill_extractor.py`의 `term_pattern()`이 한글/영문 스크립트별로 다른 경계 규칙을 쓰며 `job_parser.py`도 이를 공유합니다. 유사한 텍스트 매칭 로직을 추가할 때 이 패턴을 재사용하세요.
+- **템플릿/필터 공유**: 새 라우터를 추가할 때 `Jinja2Templates`를 직접 생성하지 말고 `from app.templates import templates`를 사용하세요 — 그래야 `bulleted` 필터와 `flash_messages` 전역이 자동으로 딸려옵니다.
+- **한국어 UI**: 상수, 템플릿, flash 메시지, 에러 문자열은 한국어로 작성되어 있습니다. 새 문자열도 이 관례를 따르세요 (`ocr.py`의 `RuntimeError` 메시지처럼 사용자에게 그대로 노출되는 예외 메시지도 포함).

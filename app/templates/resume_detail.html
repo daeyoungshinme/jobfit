@@ -49,6 +49,7 @@
 
 <p><a href="/analysis/dashboard?resume_id={{ resume.id }}" class="btn-secondary">이 이력서로 매칭 대시보드 보기</a></p>
 
+<a href="/resumes/{{ resume.id }}/edit" class="btn-secondary">수정</a>
 <form method="post" action="/resumes/{{ resume.id }}/delete" onsubmit="return confirm('이 이력서를 삭제할까요?');">
   <button type="submit" class="btn-danger">삭제</button>
 </form>

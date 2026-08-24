@@ -26,6 +26,10 @@ def _build_resume(*, label: str, source_type: str, raw_text: str, structured: di
     )
 
 
+def _compose_form_raw_text(career: str, projects: str, education: str, skills_text: str) -> str:
+    return f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
+
+
 @router.get("/new")
 def new_resume_form(request: Request):
     return templates.TemplateResponse("resume_new.html", {"request": request})
@@ -99,9 +103,7 @@ def submit_resume_form(
             status_code=422,
         )
 
-    raw_text = (
-        f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
-    )
+    raw_text = _compose_form_raw_text(career, projects, education, skills_text)
     resume = _build_resume(
         label=label,
         source_type="form",
@@ -136,6 +138,68 @@ def resume_detail(resume_id: int, request: Request, db: Session = Depends(get_db
         "resume_detail.html",
         {"request": request, "resume": resume, "suggestions": suggestions, "jobs": jobs},
     )
+
+
+@router.get("/{resume_id}/edit")
+def edit_resume_form(resume_id: int, request: Request, db: Session = Depends(get_db)):
+    resume = db.get(Resume, resume_id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="이력서를 찾을 수 없습니다")
+    return templates.TemplateResponse("resume_edit.html", {"request": request, "resume": resume})
+
+
+@router.post("/{resume_id}/edit")
+def update_resume(
+    resume_id: int,
+    request: Request,
+    label: str = Form(""),
+    raw_text: str = Form(""),
+    career: str = Form(""),
+    projects: str = Form(""),
+    education: str = Form(""),
+    skills_text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    resume = db.get(Resume, resume_id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="이력서를 찾을 수 없습니다")
+
+    errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
+    if resume.source_type == "file":
+        errors.update(require_fields({"raw_text": raw_text}, {"raw_text": "이력서 원문을 입력해주세요."}))
+    if errors:
+        resume.label = label
+        return templates.TemplateResponse(
+            "resume_edit.html",
+            {
+                "request": request,
+                "resume": resume,
+                "errors": errors,
+                "values": {
+                    "raw_text": raw_text,
+                    "career": career,
+                    "projects": projects,
+                    "education": education,
+                    "skills_text": skills_text,
+                },
+            },
+            status_code=422,
+        )
+
+    resume.label = label
+    if resume.source_type == "file":
+        resume.raw_text = raw_text
+    else:
+        resume.raw_text = _compose_form_raw_text(career, projects, education, skills_text)
+        resume.structured = {
+            "career": career,
+            "projects": projects,
+            "education": education,
+            "skills_text": skills_text,
+        }
+    resume.extracted_skills = extract_skill_names(resume.raw_text)
+    db.commit()
+    return RedirectResponse(url=f"/resumes/{resume_id}?msg=resume_updated", status_code=303)
 
 
 @router.post("/{resume_id}/delete")

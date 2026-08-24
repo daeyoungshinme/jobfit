@@ -27,6 +27,7 @@ FLASH_MESSAGES = {
     "resume_uploaded": ("이력서가 업로드되었습니다.", "success"),
     "resume_created": ("이력서가 등록되었습니다.", "success"),
     "resume_deleted": ("이력서가 삭제되었습니다.", "success"),
+    "resume_updated": ("이력서가 수정되었습니다.", "success"),
     "job_not_found": ("존재하지 않는 채용공고입니다.", "error"),
     "resume_not_found": ("존재하지 않는 이력서입니다.", "error"),
 }

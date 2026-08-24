@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 {% block title %}매칭 대시보드 - JobFit{% endblock %}
 {% block content %}
-<div class="tabs" role="tablist" aria-label="분석 보기 전환">
-  <a role="tab" aria-selected="true" class="tab-btn active" href="/analysis/dashboard">매칭 대시보드</a>
-  <a role="tab" aria-selected="false" class="tab-btn" href="/analysis/skills">스킬 통계</a>
-</div>
+{% from "_analysis_tabs.html" import analysis_tabs %}
+{{ analysis_tabs("dashboard") }}
 <h1>매칭 대시보드</h1>
 <p class="hint">이력서를 선택하면 등록된 채용공고와의 매칭 점수, 부족한 스킬, 지원 우선순위를 확인할 수 있습니다.</p>
 

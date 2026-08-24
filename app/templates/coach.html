@@ -42,18 +42,6 @@
   </ul>
 </div>
 
-<details class="card">
-  <summary><h3 style="display:inline">일반 이력서 체크리스트</h3></summary>
-  <ul class="suggestion-list">
-    {% for s in generic_suggestions %}
-    <li class="suggestion suggestion-{{ s.status }}">
-      <span class="badge">{{ "✓" if s.status == "ok" else "!" }}</span>
-      <div>
-        <strong>{{ s.title }}</strong>
-        <p>{{ s.detail }}</p>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-</details>
+<p class="hint">이력서 전반에 대한 일반 체크리스트(길이, 항목 구성, 정량 성과 등)는
+  <a href="/resumes/{{ resume.id }}">이력서 상세 페이지</a>에서 확인하세요.</p>
 {% endblock %}

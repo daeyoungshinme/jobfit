@@ -18,22 +18,17 @@
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/jobs">JobFit</a>
-      <nav>
-        <div class="nav-group">
-          <span class="nav-group-label">공고</span>
-          <a href="/jobs/new" {% if request.url.path == "/jobs/new" %}aria-current="page"{% endif %}>등록</a>
-          <a href="/jobs" {% if request.url.path == "/jobs" or (request.url.path.startswith("/jobs/") and request.url.path != "/jobs/new") %}aria-current="page"{% endif %}>목록</a>
-        </div>
-        <div class="nav-group">
-          <span class="nav-group-label">이력서</span>
-          <a href="/resumes/new" {% if request.url.path == "/resumes/new" %}aria-current="page"{% endif %}>등록</a>
-          <a href="/resumes" {% if request.url.path == "/resumes" or (request.url.path.startswith("/resumes/") and request.url.path != "/resumes/new") %}aria-current="page"{% endif %}>목록</a>
-        </div>
-        <div class="nav-group">
-          <span class="nav-group-label">분석</span>
-          <a href="/analysis/dashboard" {% if request.url.path in ("/analysis/dashboard", "/analysis/coach") %}aria-current="page"{% endif %}>대시보드</a>
-          <a href="/analysis/skills" {% if request.url.path == "/analysis/skills" %}aria-current="page"{% endif %}>스킬 통계</a>
-        </div>
+      {% set nav_active = nav_active_for(request.url.path) %}
+      <nav class="primary-nav">
+        <a href="/jobs" class="nav-link" {% if nav_active == "jobs" %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">📋</span><span class="nav-label">공고</span>
+        </a>
+        <a href="/resumes" class="nav-link" {% if nav_active == "resumes" %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">📄</span><span class="nav-label">이력서</span>
+        </a>
+        <a href="/analysis/dashboard" class="nav-link" {% if nav_active == "analysis" %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">🎯</span><span class="nav-label">매칭·코칭</span>
+        </a>
       </nav>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-label="테마 전환">🌙</button>
     </div>

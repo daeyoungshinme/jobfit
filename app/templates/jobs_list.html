@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}채용공고 목록 - JobFit{% endblock %}
 {% block content %}
-<h1>채용공고 목록 {% if active_filter_count %}<span class="tag tag-source">{{ active_filter_count }}개 필터 적용됨</span>{% endif %}</h1>
+<div class="page-header">
+  <h1>채용공고 목록 {% if active_filter_count %}<span class="tag tag-source">{{ active_filter_count }}개 필터 적용됨</span>{% endif %}</h1>
+  <a href="/jobs/new" class="btn-primary">+ 새 공고 등록</a>
+</div>
 
 <form method="get" action="/jobs" class="card filter-bar">
   <details class="filter-group" {% if filters.position %}open{% endif %}>

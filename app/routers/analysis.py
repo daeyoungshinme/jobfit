@@ -8,7 +8,6 @@ from app.db import get_db
 from app.models import JobPosting, Resume
 from app.services.job_fit_coach import build_coaching
 from app.services.matcher import rank_matches, skill_ranking
-from app.services.resume_reviewer import review_resume
 from app.templates import templates
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -77,7 +76,6 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
         return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
 
     coaching = build_coaching(resume.extracted_skills or [], job)
-    generic_suggestions = review_resume(resume.raw_text, len(resume.extracted_skills or []))
     return templates.TemplateResponse(
         "coach.html",
         {
@@ -85,6 +83,5 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
             "resume": resume,
             "job": job,
             "coaching": coaching,
-            "generic_suggestions": generic_suggestions,
         },
     )

@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 {% block title %}스킬 통계 - JobFit{% endblock %}
 {% block content %}
-<div class="tabs" role="tablist" aria-label="분석 보기 전환">
-  <a role="tab" aria-selected="false" class="tab-btn" href="/analysis/dashboard">매칭 대시보드</a>
-  <a role="tab" aria-selected="true" class="tab-btn active" href="/analysis/skills">스킬 통계</a>
-</div>
+{% from "_analysis_tabs.html" import analysis_tabs %}
+{{ analysis_tabs("skills") }}
 <h1>직무별 요구 스킬 통계</h1>
 <p class="hint">등록된 채용공고를 직무 기준으로 집계해 가장 많이 요구되는 스킬을 보여줍니다. 이직 준비 시 우선적으로 갖춰야 할 스킬을 파악하는 데 활용하세요.</p>
 

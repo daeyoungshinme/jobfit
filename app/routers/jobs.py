@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.constants import (
     EXPERIENCE_LEVELS,
+    JOB_NOT_FOUND_DETAIL,
     JOB_STATUS_DEFAULT,
     JOB_STATUSES,
     POSITIONS,
@@ -31,29 +32,49 @@ _JOB_REQUIRED_FIELD_MESSAGES = {
     "raw_text": "공고 원문을 입력해주세요.",
 }
 
+_JOB_FORM_FIELDS = (
+    "title", "company", "address", "url", "source_site",
+    "position", "experience_level", "status", "raw_text",
+)
 
-def _apply_job_fields(
-    job: JobPosting,
-    *,
-    title: str,
-    company: str,
-    address: str,
-    url: str,
-    source_site: str,
-    position: str,
-    experience_level: str,
-    status: str,
-    raw_text: str,
-) -> None:
-    job.title = title
-    job.company = company
-    job.address = address
-    job.url = url
-    job.source_site = source_site.strip() or guess_source_site(url)
-    job.position = position
-    job.experience_level = experience_level
-    job.status = status or JOB_STATUS_DEFAULT
-    job.raw_text = raw_text
+
+class JobForm:
+    """The job create/edit form's 9 fields as a single FastAPI dependency.
+
+    Spelled out once here instead of repeated as Form(...) params in both
+    create_job and update_job plus an error-render values dict.
+    """
+
+    def __init__(
+        self,
+        title: str = Form(""),
+        company: str = Form(""),
+        address: str = Form(""),
+        url: str = Form(""),
+        source_site: str = Form(""),
+        position: str = Form(""),
+        experience_level: str = Form(""),
+        status: str = Form(""),
+        raw_text: str = Form(""),
+    ):
+        self.title = title
+        self.company = company
+        self.address = address
+        self.url = url
+        self.source_site = source_site
+        self.position = position
+        self.experience_level = experience_level
+        self.status = status
+        self.raw_text = raw_text
+
+    def as_dict(self) -> dict:
+        return {name: getattr(self, name) for name in _JOB_FORM_FIELDS}
+
+    def validation_errors(self) -> dict:
+        return require_fields(
+            {"title": self.title, "position": self.position, "raw_text": self.raw_text},
+            _JOB_REQUIRED_FIELD_MESSAGES,
+        )
 
 
 def _apply_parsed_sections(job: JobPosting, parsed: ParsedJobPosting) -> None:
@@ -62,6 +83,37 @@ def _apply_parsed_sections(job: JobPosting, parsed: ParsedJobPosting) -> None:
     job.preferred_text = parsed.preferred_text
     job.required_skills = parsed.required_skills
     job.preferred_skills = parsed.preferred_skills
+
+
+def _persist_job(job: JobPosting, form: JobForm) -> None:
+    """Write validated form fields + re-parsed sections onto `job`. Caller commits."""
+    raw_text = normalize_newlines(form.raw_text)
+    job.title = form.title
+    job.company = form.company
+    job.address = form.address
+    job.url = form.url
+    job.source_site = form.source_site.strip() or guess_source_site(form.url)
+    job.position = form.position
+    job.experience_level = form.experience_level
+    job.status = form.status or JOB_STATUS_DEFAULT
+    job.raw_text = raw_text
+    _apply_parsed_sections(job, parse_job_posting(raw_text))
+
+
+def _render_job_form(request: Request, template: str, form: JobForm, errors: dict, job=None):
+    return templates.TemplateResponse(
+        template,
+        {
+            "request": request,
+            "job": job,
+            "positions": POSITIONS,
+            "experience_levels": EXPERIENCE_LEVELS,
+            "statuses": JOB_STATUSES,
+            "errors": errors,
+            "values": form.as_dict(),
+        },
+        status_code=422,
+    )
 
 
 @router.get("/new")
@@ -109,63 +161,13 @@ async def ocr_job_image(file: UploadFile):
 
 
 @router.post("")
-def create_job(
-    request: Request,
-    title: str = Form(""),
-    company: str = Form(""),
-    address: str = Form(""),
-    url: str = Form(""),
-    source_site: str = Form(""),
-    position: str = Form(""),
-    experience_level: str = Form(""),
-    status: str = Form(""),
-    raw_text: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    errors = require_fields(
-        {"title": title, "position": position, "raw_text": raw_text},
-        _JOB_REQUIRED_FIELD_MESSAGES,
-    )
+def create_job(request: Request, form: JobForm = Depends(), db: Session = Depends(get_db)):
+    errors = form.validation_errors()
     if errors:
-        return templates.TemplateResponse(
-            "job_new.html",
-            {
-                "request": request,
-                "positions": POSITIONS,
-                "experience_levels": EXPERIENCE_LEVELS,
-                "statuses": JOB_STATUSES,
-                "errors": errors,
-                "values": {
-                    "title": title,
-                    "company": company,
-                    "address": address,
-                    "url": url,
-                    "source_site": source_site,
-                    "position": position,
-                    "experience_level": experience_level,
-                    "status": status,
-                    "raw_text": raw_text,
-                },
-            },
-            status_code=422,
-        )
+        return _render_job_form(request, "job_new.html", form, errors)
 
-    raw_text = normalize_newlines(raw_text)
-    parsed = parse_job_posting(raw_text)
     job = JobPosting()
-    _apply_job_fields(
-        job,
-        title=title,
-        company=company,
-        address=address,
-        url=url,
-        source_site=source_site,
-        position=position,
-        experience_level=experience_level,
-        status=status,
-        raw_text=raw_text,
-    )
-    _apply_parsed_sections(job, parsed)
+    _persist_job(job, form)
     db.add(job)
     db.commit()
     db.refresh(job)
@@ -232,7 +234,7 @@ def list_jobs(
 def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
     job = db.get(JobPosting, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="공고를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
     sections_detected = parse_job_posting(job.raw_text).sections_detected
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
     return templates.TemplateResponse(
@@ -251,7 +253,7 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
 def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
     job = db.get(JobPosting, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="공고를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
     return templates.TemplateResponse(
         "job_edit.html",
         {
@@ -265,69 +267,16 @@ def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/{job_id}/edit")
-def update_job(
-    job_id: int,
-    request: Request,
-    title: str = Form(""),
-    company: str = Form(""),
-    address: str = Form(""),
-    url: str = Form(""),
-    source_site: str = Form(""),
-    position: str = Form(""),
-    experience_level: str = Form(""),
-    status: str = Form(""),
-    raw_text: str = Form(""),
-    db: Session = Depends(get_db),
-):
+def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Session = Depends(get_db)):
     job = db.get(JobPosting, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="공고를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
 
-    errors = require_fields(
-        {"title": title, "position": position, "raw_text": raw_text},
-        _JOB_REQUIRED_FIELD_MESSAGES,
-    )
+    errors = form.validation_errors()
     if errors:
-        _apply_job_fields(
-            job,
-            title=title,
-            company=company,
-            address=address,
-            url=url,
-            source_site=source_site,
-            position=position,
-            experience_level=experience_level,
-            status=status,
-            raw_text=raw_text,
-        )
-        return templates.TemplateResponse(
-            "job_edit.html",
-            {
-                "request": request,
-                "job": job,
-                "positions": POSITIONS,
-                "experience_levels": EXPERIENCE_LEVELS,
-                "statuses": JOB_STATUSES,
-                "errors": errors,
-            },
-            status_code=422,
-        )
+        return _render_job_form(request, "job_edit.html", form, errors, job=job)
 
-    raw_text = normalize_newlines(raw_text)
-    parsed = parse_job_posting(raw_text)
-    _apply_job_fields(
-        job,
-        title=title,
-        company=company,
-        address=address,
-        url=url,
-        source_site=source_site,
-        position=position,
-        experience_level=experience_level,
-        status=status,
-        raw_text=raw_text,
-    )
-    _apply_parsed_sections(job, parsed)
+    _persist_job(job, form)
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_updated", status_code=303)
 
@@ -337,9 +286,10 @@ def update_job_status(job_id: int, status: str = Form(...), db: Session = Depend
     job = db.get(JobPosting, job_id)
     if job is None:
         return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
-    if status in JOB_STATUSES:
-        job.status = status
-        db.commit()
+    if status not in JOB_STATUSES:
+        return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
+    job.status = status
+    db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_updated", status_code=303)
 
 

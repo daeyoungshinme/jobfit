@@ -184,6 +184,37 @@ def test_quick_status_update_missing_job_redirects(client):
     assert response.headers["location"] == "/jobs?msg=job_not_found"
 
 
+def test_quick_status_update_rejects_unknown_status(client, db_session):
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.post(
+        f"/jobs/{job.id}/status", data={"status": "이상한값"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/jobs/{job.id}?msg=job_status_invalid"
+    db_session.refresh(job)
+    assert job.status == "관심"
+
+
+def test_update_job_validation_error_keeps_submitted_values(client, db_session):
+    job = JobPosting(title="원래 제목", position="백엔드 개발자", raw_text="자격요건\nPython")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.post(
+        f"/jobs/{job.id}/edit",
+        data={"title": "", "company": "새 회사명", "position": "백엔드 개발자", "raw_text": ""},
+    )
+    assert response.status_code == 422
+    assert "새 회사명" in response.text  # submitted value re-rendered, not the stored one
+    db_session.refresh(job)
+    assert job.title == "원래 제목"  # nothing persisted
+
+
 def test_preview_job_returns_parsed_fields(client):
     response = client.post("/jobs/preview", data={"raw_text": "[자격요건]\nPython, FastAPI 경험"})
     assert response.status_code == 200

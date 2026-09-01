@@ -32,17 +32,23 @@ JOB_STATUSES = [
 ]
 JOB_STATUS_DEFAULT = "관심"
 
+# 404 detail strings for GET routes. The redirect flows use the *_not_found
+# FLASH_MESSAGES entries below; keep the wording of the two in sync.
+JOB_NOT_FOUND_DETAIL = "존재하지 않는 채용공고입니다."
+RESUME_NOT_FOUND_DETAIL = "존재하지 않는 이력서입니다."
+
 FLASH_MESSAGES = {
     "job_created": ("채용공고가 등록되었습니다.", "success"),
     "job_updated": ("채용공고가 수정되었습니다.", "success"),
     "job_deleted": ("채용공고가 삭제되었습니다.", "success"),
     "job_status_updated": ("지원 상태가 변경되었습니다.", "success"),
+    "job_status_invalid": ("알 수 없는 지원 상태입니다.", "error"),
     "resume_uploaded": ("이력서가 업로드되었습니다.", "success"),
     "resume_created": ("이력서가 등록되었습니다.", "success"),
     "resume_deleted": ("이력서가 삭제되었습니다.", "success"),
     "resume_updated": ("이력서가 수정되었습니다.", "success"),
-    "job_not_found": ("존재하지 않는 채용공고입니다.", "error"),
-    "resume_not_found": ("존재하지 않는 이력서입니다.", "error"),
+    "job_not_found": (JOB_NOT_FOUND_DETAIL, "error"),
+    "resume_not_found": (RESUME_NOT_FOUND_DETAIL, "error"),
 }
 
 MATCH_REQUIRED_WEIGHT = 0.7

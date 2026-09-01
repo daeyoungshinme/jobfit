@@ -33,20 +33,36 @@ def _make_isolated_engine():
     return engine
 
 
-def test_migrate_table_columns_adds_missing_columns_once(monkeypatch):
+def test_migrate_table_columns_adds_missing_columns_and_is_idempotent(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)
 
-    added = db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
-    assert added is True
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
 
     with engine.connect() as conn:
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info(job_postings)"))}
     for column, _ddl_type, _default in db_module._JOB_POSTING_NEW_COLUMNS:
         assert column in columns
 
-    added_again = db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
-    assert added_again is False
+    # Second run is a no-op (does not raise "duplicate column name").
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+
+    with engine.connect() as conn:
+        columns_again = {row[1] for row in conn.execute(text("PRAGMA table_info(job_postings)"))}
+    assert columns_again == columns
+
+
+def test_migrate_resumes_with_empty_column_list_is_noop(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE resumes (id INTEGER PRIMARY KEY, label VARCHAR(200))"))
+
+    db_module._migrate_table_columns("resumes", db_module._RESUME_NEW_COLUMNS)
+
+    with engine.connect() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(resumes)"))}
+    assert columns == {"id", "label"}
 
 
 def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):

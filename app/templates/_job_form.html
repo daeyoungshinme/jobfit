@@ -1,6 +1,6 @@
 {% macro job_form(mode, action, submit_label, positions, experience_levels, statuses, job=None, values=None, errors=None) %}
 {% set errors = errors or {} %}
-{% set v = job or values or {} %}
+{% set v = values or job or {} %}
 {% if mode == "new" %}
 <p class="hint">채용 사이트에서 공고 원문(자격요건/우대사항 포함)을 그대로 복사해서 붙여넣으세요. 제목/회사명/직무/경력조건과 필수/우대 스킬을 자동으로 채워드리니, 저장 전에 확인 후 수정하세요.</p>
 {% else %}

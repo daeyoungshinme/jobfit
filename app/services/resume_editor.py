@@ -31,6 +31,15 @@ def validate_resume_content(source_type: str, *, raw_text: str = "") -> dict[str
     return {}
 
 
+def _form_structured(career: str, projects: str, education: str, skills_text: str) -> dict:
+    return {
+        "career": career,
+        "projects": projects,
+        "education": education,
+        "skills_text": skills_text,
+    }
+
+
 def apply_resume_content(
     resume: Resume,
     *,
@@ -49,10 +58,33 @@ def apply_resume_content(
         resume.raw_text = raw_text
     else:
         resume.raw_text = compose_form_raw_text(career, projects, education, skills_text)
-        resume.structured = {
-            "career": career,
-            "projects": projects,
-            "education": education,
-            "skills_text": skills_text,
-        }
+        resume.structured = _form_structured(career, projects, education, skills_text)
     resume.extracted_skills = extract_skill_names(resume.raw_text)
+
+
+def new_resume(
+    *,
+    label: str,
+    source_type: str,
+    raw_text: str = "",
+    career: str = "",
+    projects: str = "",
+    education: str = "",
+    skills_text: str = "",
+    structured: dict | None = None,
+) -> Resume:
+    """Build a new Resume, routing content through apply_resume_content().
+
+    Keeps résumé *creation* (`resumes.py` upload / form) on the same raw_text /
+    structured / skill-extraction rules as résumé *editing*.
+    """
+    resume = Resume(label=label, source_type=source_type, structured=structured or {})
+    apply_resume_content(
+        resume,
+        raw_text=raw_text,
+        career=career,
+        projects=projects,
+        education=education,
+        skills_text=skills_text,
+    )
+    return resume

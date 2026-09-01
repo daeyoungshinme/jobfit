@@ -2,15 +2,33 @@
 
 Used by both the plain résumé edit form (`resumes.py`) and the job-tailored
 editing workspace (`analysis.py::tailor`) so the two stay in lock-step on how
-`raw_text` / `structured` are composed and how skills get re-extracted.
+`raw_text` / `structured` are composed, how skills get re-extracted, and which
+fields are required before a write is allowed.
 """
 
 from app.models import Resume
 from app.services.skill_extractor import extract_skill_names
+from app.services.validation import require_fields
+
+_RAW_TEXT_REQUIRED_MESSAGE = {"raw_text": "이력서 원문을 입력해주세요."}
 
 
 def compose_form_raw_text(career: str, projects: str, education: str, skills_text: str) -> str:
     return f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
+
+
+def validate_resume_content(source_type: str, *, raw_text: str = "") -> dict[str, str]:
+    """Field errors for an edited résumé, keyed by field name.
+
+    File-source résumés must keep a non-blank `raw_text`; form-source résumés
+    have no required content field (only the résumé label, checked by the
+    caller). Shared by `resumes.py::update_resume` and
+    `analysis.py::save_tailored_resume` so both write paths reject the same
+    empty input instead of silently overwriting stored content.
+    """
+    if source_type == "file":
+        return require_fields({"raw_text": raw_text}, _RAW_TEXT_REQUIRED_MESSAGE)
+    return {}
 
 
 def apply_resume_content(

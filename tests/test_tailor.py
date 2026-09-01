@@ -103,3 +103,29 @@ def test_tailor_post_file_resume_updates_raw_text_only(client, db_session):
     assert resume.raw_text == "수정된 텍스트 Python Kafka"
     assert resume.structured == {"original_filename": "resume.pdf"}
     assert "Kafka" in resume.extracted_skills
+
+
+def test_tailor_post_file_resume_rejects_blank_raw_text(client, db_session):
+    job = _make_job(db_session)
+    resume = Resume(
+        label="파일 이력서",
+        source_type="file",
+        raw_text="원본 텍스트 Python",
+        structured={"original_filename": "resume.pdf"},
+        extracted_skills=["Python"],
+    )
+    db_session.add(resume)
+    db_session.commit()
+    db_session.refresh(resume)
+
+    response = client.post(
+        "/analysis/tailor",
+        params={"resume_id": resume.id, "job_id": job.id},
+        data={"raw_text": "   "},
+        follow_redirects=False,
+    )
+    assert response.status_code == 422
+
+    db_session.refresh(resume)
+    assert resume.raw_text == "원본 텍스트 Python"
+    assert resume.extracted_skills == ["Python"]

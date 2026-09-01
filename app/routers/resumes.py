@@ -5,7 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import JobPosting, Resume
-from app.services.resume_editor import apply_resume_content, compose_form_raw_text
+from app.services.resume_editor import (
+    apply_resume_content,
+    compose_form_raw_text,
+    validate_resume_content,
+)
 from app.services.resume_parser import extract_text_from_upload
 from app.services.resume_reviewer import review_resume
 from app.services.skill_extractor import extract_skill_names
@@ -162,8 +166,7 @@ def update_resume(
         raise HTTPException(status_code=404, detail="이력서를 찾을 수 없습니다")
 
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
-    if resume.source_type == "file":
-        errors.update(require_fields({"raw_text": raw_text}, {"raw_text": "이력서 원문을 입력해주세요."}))
+    errors.update(validate_resume_content(resume.source_type, raw_text=raw_text))
     if errors:
         resume.label = label
         return templates.TemplateResponse(

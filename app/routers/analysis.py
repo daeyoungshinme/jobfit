@@ -8,7 +8,7 @@ from app.db import get_db
 from app.models import JobPosting, Resume
 from app.services.job_fit_coach import build_coaching
 from app.services.matcher import rank_matches, skill_ranking
-from app.services.resume_editor import apply_resume_content
+from app.services.resume_editor import apply_resume_content, validate_resume_content
 from app.templates import templates
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -51,12 +51,9 @@ def dashboard(
 
 @router.get("/coach")
 def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
-    resume = db.get(Resume, resume_id) if resume_id else None
-    if resume is None:
-        return RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)
-    job = db.get(JobPosting, job_id) if job_id else None
-    if job is None:
-        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
+    resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
+    if redirect:
+        return redirect
 
     coaching = build_coaching(resume.extracted_skills or [], job, resume_text=resume.raw_text)
     return templates.TemplateResponse(
@@ -71,7 +68,7 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
 
 
 def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
-    """Shared guard for the tailor routes — returns (resume, job) or a redirect."""
+    """Shared guard for the coach/tailor routes — returns (resume, job) or a redirect."""
     resume = db.get(Resume, resume_id) if resume_id else None
     if resume is None:
         return None, None, RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)
@@ -81,12 +78,7 @@ def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
     return resume, job, None
 
 
-@router.get("/tailor")
-def tailor(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
-    resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
-    if redirect:
-        return redirect
-
+def _render_tailor(request, resume, job, *, errors=None, values=None, status_code=200):
     coaching = build_coaching(resume.extracted_skills or [], job, resume_text=resume.raw_text)
     return templates.TemplateResponse(
         "tailor.html",
@@ -95,13 +87,25 @@ def tailor(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = 
             "resume": resume,
             "job": job,
             "coaching": coaching,
-            "structured": resume.structured or {},
+            "structured": values if values is not None else (resume.structured or {}),
+            "errors": errors or {},
+            "values": values or {},
         },
+        status_code=status_code,
     )
+
+
+@router.get("/tailor")
+def tailor(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
+    resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
+    if redirect:
+        return redirect
+    return _render_tailor(request, resume, job)
 
 
 @router.post("/tailor")
 def save_tailored_resume(
+    request: Request,
     resume_id: int = 0,
     job_id: int = 0,
     raw_text: str = Form(""),
@@ -114,6 +118,17 @@ def save_tailored_resume(
     resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
     if redirect:
         return redirect
+
+    errors = validate_resume_content(resume.source_type, raw_text=raw_text)
+    if errors:
+        values = {
+            "raw_text": raw_text,
+            "career": career,
+            "projects": projects,
+            "education": education,
+            "skills_text": skills_text,
+        }
+        return _render_tailor(request, resume, job, errors=errors, values=values, status_code=422)
 
     apply_resume_content(
         resume,

@@ -12,23 +12,14 @@
   </div>
 </div>
 
+{% from "_coaching.html" import suggestion_list %}
 {% set warning_count = suggestions|selectattr("status", "equalto", "warning")|list|length %}
 <details class="card">
   <summary><strong>이력서 일반 체크리스트</strong>
     {% if warning_count %}<span class="tag tag-required">{{ warning_count }}건 확인 필요</span>{% else %}<span class="tag tag-preferred">모두 양호</span>{% endif %}
   </summary>
-  <p class="hint">공고별 맞춤 코칭은 아래 "특정 공고 맞춤 코칭"에서 확인하세요.</p>
-  <ul class="suggestion-list">
-    {% for s in suggestions %}
-    <li class="suggestion suggestion-{{ s.status }}">
-      <span class="badge">{{ "✓" if s.status == "ok" else "!" }}</span>
-      <div>
-        <strong>{{ s.title }}</strong>
-        <p>{{ s.detail }}</p>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+  <p class="hint">공고별 맞춤 코칭은 아래 "특정 공고에 맞춰 코칭"에서 확인하세요.</p>
+  {{ suggestion_list(suggestions) }}
 </details>
 
 <div class="card">

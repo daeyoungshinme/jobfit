@@ -1,61 +1,24 @@
 {% extends "base.html" %}
 {% block title %}{{ job.title }} 맞춤 코칭 - JobFit{% endblock %}
 {% block content %}
+{% from "_coaching.html" import score_card, category_gaps, suggestion_list %}
 <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
 <h1>{{ job.title }} 맞춤 이력서 코칭</h1>
 <p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})</p>
 
-<div class="card">
-  <h3>매칭 점수</h3>
-  <div class="bar-track"><div class="bar-fill" style="width: {{ coaching.match.score }}%;"></div></div>
-  {{ coaching.match.score }}점
-</div>
+{{ score_card(coaching.match) }}
 
-<div class="card">
-  <h3>부족한 스킬 (카테고리별)</h3>
-  {% if not coaching.category_gaps %}
-  <p class="ok-text">부족한 스킬이 없습니다.</p>
-  {% endif %}
-  {% for g in coaching.category_gaps %}
-  <div class="category-gap">
-    <h4>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h4>
-    <div class="tags">
-      {% for s in g.required_missing %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
-      {% for s in g.preferred_missing %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
-    </div>
-  </div>
-  {% endfor %}
-</div>
+{{ category_gaps(coaching.category_gaps, "부족한 스킬이 없습니다.") }}
 
 <div class="card">
   <h3>이 공고 맞춤 보완 가이드</h3>
-  <ul class="suggestion-list">
-    {% for s in coaching.suggestions %}
-    <li class="suggestion suggestion-{{ 'ok' if s.status == 'ok' else ('warning' if s.status == 'warning' else 'info') }}">
-      <span class="badge">{{ "✓" if s.status == "ok" else ("!" if s.status == "warning" else "i") }}</span>
-      <div>
-        <strong>{{ s.title }}</strong>
-        <p>{{ s.detail }}</p>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+  {{ suggestion_list(coaching.suggestions) }}
 </div>
 
 <div class="card">
   <h3>이력서 일반 체크리스트</h3>
   <p class="hint">특정 공고와 무관하게 이력서 전반(분량, 항목 구성, 정량 성과, 액션 동사 등)을 점검합니다.</p>
-  <ul class="suggestion-list">
-    {% for s in coaching.general_review %}
-    <li class="suggestion suggestion-{{ s.status }}">
-      <span class="badge">{{ "✓" if s.status == "ok" else "!" }}</span>
-      <div>
-        <strong>{{ s.title }}</strong>
-        <p>{{ s.detail }}</p>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+  {{ suggestion_list(coaching.general_review) }}
 </div>
 
 <p><a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">이 공고에 맞춰 이력서 편집하기</a></p>

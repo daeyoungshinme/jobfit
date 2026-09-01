@@ -2,20 +2,13 @@
 {% block title %}{{ job.title }} 맞춤 이력서 편집 - JobFit{% endblock %}
 {% block content %}
 {% from "_resume_fields.html" import resume_fields %}
+{% from "_coaching.html" import score_card, category_gaps %}
 <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
 <h1>{{ job.title }} 맞춤 이력서 편집</h1>
 <p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})
   · <a href="/analysis/coach?resume_id={{ resume.id }}&job_id={{ job.id }}">전체 코칭 보기</a></p>
 
-<div class="card">
-  <h3>매칭 점수</h3>
-  {% if coaching.match.has_skill_data %}
-  <div class="bar-track"><div class="bar-fill" style="width: {{ coaching.match.score }}%;"></div></div>
-  {{ coaching.match.score }}점
-  {% else %}
-  <span class="hint">이 공고에서 인식된 스킬이 없어 점수를 계산할 수 없습니다.</span>
-  {% endif %}
-</div>
+{{ score_card(coaching.match) }}
 
 <a href="#resume-editor" class="back-link mobile-jump">이력서 편집으로 ↓</a>
 
@@ -38,20 +31,7 @@
       </div>
     </div>
 
-    {% if coaching.category_gaps %}
-    <div class="card">
-      <h3>부족한 스킬 (카테고리별)</h3>
-      {% for g in coaching.category_gaps %}
-      <div class="category-gap">
-        <h4>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h4>
-        <div class="tags">
-          {% for s in g.required_missing %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
-          {% for s in g.preferred_missing %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
+    {% if coaching.category_gaps %}{{ category_gaps(coaching.category_gaps) }}{% endif %}
 
     {% if job.required_text or job.preferred_text %}
     <details class="card">

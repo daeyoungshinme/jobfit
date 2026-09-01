@@ -1,0 +1,47 @@
+{# Shared coach/tailor rendering pieces. #}
+
+{% macro score_card(match) %}
+<div class="card">
+  <h3>매칭 점수</h3>
+  {% if match.has_skill_data %}
+  <div class="bar-track"><div class="bar-fill" style="width: {{ match.score }}%;"></div></div>
+  {{ match.score }}점
+  {% else %}
+  <span class="hint">이 공고에서 인식된 스킬이 없어 점수를 계산할 수 없습니다.</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro category_gaps(gaps, empty_message=None) %}
+<div class="card">
+  <h3>부족한 스킬 (카테고리별)</h3>
+  {% if not gaps %}
+  {% if empty_message %}<p class="ok-text">{{ empty_message }}</p>{% endif %}
+  {% else %}
+  {% for g in gaps %}
+  <div class="category-gap">
+    <h4>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h4>
+    <div class="tags">
+      {% for s in g.required_missing %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
+      {% for s in g.preferred_missing %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro suggestion_list(suggestions) %}
+<ul class="suggestion-list">
+  {% for s in suggestions %}
+  {% set status = s.status if s.status in ("ok", "warning", "info") else "info" %}
+  <li class="suggestion suggestion-{{ status }}">
+    <span class="badge">{{ {"ok": "✓", "warning": "!", "info": "i"}[status] }}</span>
+    <div>
+      <strong>{{ s.title }}</strong>
+      <p>{{ s.detail }}</p>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}

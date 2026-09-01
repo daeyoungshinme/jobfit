@@ -3,3 +3,12 @@ __pycache__/
 .venv/
 jobfit.db
 .claude/
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.idea/
+.vscode/
+.DS_Store
+venv/

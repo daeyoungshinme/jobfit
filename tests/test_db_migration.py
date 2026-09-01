@@ -1,16 +1,13 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app import db as db_module
 
+from .conftest import make_memory_engine
+
 
 def _make_isolated_engine():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    engine = make_memory_engine()
     with engine.begin() as conn:
         conn.execute(
             text(

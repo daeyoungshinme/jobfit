@@ -5,8 +5,10 @@ JobFit — 채용공고/이력서 분석 도구 (FastAPI + SQLite, 서버사이�
 ## 실행 / 테스트
 
 ```bash
-uvicorn app.main:app --reload --port 8100   # 또는 ./dev.sh (Git Bash, 기존 서버 정리 후 재기동)
-pytest                                       # tests/
+python -m venv .venv && source .venv/Scripts/activate && pip install -r requirements.txt   # 최초 1회
+uvicorn app.main:app --reload --port 8100   # 또는 ./dev.sh (Git Bash, 포트 점유 프로세스 정리 후 재기동)
+pytest                                       # 전체 (tests/)
+pytest tests/test_matcher.py -q              # 단일 파일 (또는 -k 키워드)
 ```
 
 데이터는 프로젝트 루트의 `jobfit.db` (SQLite)에 저장됩니다. 외부 AI API는 사용하지 않으며, 스킬 추출/매칭은 전부 정규식·사전 기반 규칙 매칭입니다. OCR([app/services/ocr.py](app/services/ocr.py))만 예외적으로 로컬에 설치된 Tesseract-OCR 바이너리를 호출하지만, 이 역시 외부 서비스 호출이 아닙니다.
@@ -17,8 +19,10 @@ pytest                                       # tests/
 
 요청 흐름: `routers` → `services` → `models`. 템플릿은 [app/templates.py](app/templates.py)의 단일 `Jinja2Templates` 인스턴스를 모든 라우터가 `from app.templates import templates`로 가져다 쓰는 공유 구조이며, 여기에 `bulleted` 커스텀 필터와 `flash_messages` 전역이 등록되어 있습니다.
 
-- [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, startup 시 `init_db()` 호출.
+- [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, `lifespan`에서 `init_db()` 호출, `/static` 마운트, `/` → `/jobs` 리다이렉트.
 - [app/templates.py](app/templates.py) — 공유 `Jinja2Templates` 인스턴스, `bulleted` 필터·`flash_messages` 전역 등록.
+- [app/static/app.js](app/static/app.js) / [style.css](app/static/style.css) — 페이지 전역에서 로드되는 단일 JS/CSS. 서버사이드 렌더링을 점진적 향상(progressive enhancement)만 하는 계층 (아래 컨벤션 참고).
+- [app/templates/base.html](app/templates/base.html) — 공통 레이아웃. `#toast`(flash), `#theme-toggle`, `#main-content` 마크업 계약을 `app.js`와 공유. 탭 UI는 `.tab-btn[data-tab]`/`.tab-panel`(현재 [resume_new.html](app/templates/resume_new.html)).
 - [app/routers/jobs.py](app/routers/jobs.py) — 채용공고 CRUD, 스킬 미리보기, OCR 업로드, 출처 사이트(source_site) 추측, 지원 상태(`status`) 빠른 변경(`POST /jobs/{id}/status`).
 - [app/routers/resumes.py](app/routers/resumes.py) — 이력서 업로드(PDF/DOCX/TXT)/폼 등록/수정/삭제. 저장 로직은 [app/services/resume_editor.py](app/services/resume_editor.py)의 `apply_resume_content()`에 모여 있음(`analysis.py`의 맞춤 편집과 공유).
 - [app/routers/analysis.py](app/routers/analysis.py) — 매칭 대시보드(스킬 수요 랭킹 포함), 이력서-공고 코칭(`/coach`), 공고 맞춤 이력서 편집 워크스페이스(`/tailor`, [tailor.html](app/templates/tailor.html)).
@@ -43,4 +47,5 @@ pytest                                       # tests/
 - **스크립트 인식 단어 경계**: 한글은 조사가 단어에 바로 붙기 때문에, `skill_extractor.py`의 `term_pattern()`이 한글/영문 스크립트별로 다른 경계 규칙을 쓰며 `job_parser.py`도 이를 공유합니다. 유사한 텍스트 매칭 로직을 추가할 때 이 패턴을 재사용하세요.
 - **템플릿/필터 공유**: 새 라우터를 추가할 때 `Jinja2Templates`를 직접 생성하지 말고 `from app.templates import templates`를 사용하세요 — 그래야 `bulleted` 필터와 `flash_messages`·`JOB_STATUS_DEFAULT` 전역이 자동으로 딸려옵니다. 반복되는 마크업은 `_`로 시작하는 파셜의 `{% macro %}`로 뽑아 재사용합니다 — `_job_form.html`(공고 폼), `_resume_fields.html`(이력서 항목), `_filter_group.html`(체크박스 필터 그룹), `_coaching.html`(`score_card`/`category_gaps`/`suggestion_list`).
 - **라우터 응답**: `templates.TemplateResponse(request, "name.html", {...})` 시그니처를 사용하세요(`request`가 첫 인자). 폼 검증은 `app/services/validation.py::require_fields`, 공고 폼은 `jobs.py::JobForm` 의존성 + `_persist_job()`, 이력서 쓰기는 `app/services/resume_editor.py`(`apply_resume_content`/`new_resume`/`validate_resume_content`)를 재사용합니다.
-- **한국어 UI**: 상수, 템플릿, flash 메시지, 에러 문자열은 한국어로 작성되어 있습니다. 새 문자열도 이 관례를 따르세요 (`ocr.py`의 `RuntimeError` 메시지처럼 사용자에게 그대로 노출되는 예외 메시지도 포함).
+- **한국어 UI**: 상수, 템플릿, flash 메시지, 에러 문자열은 한국어로 작성되어 있습니다. 새 문자열도 이 관례를 따르세요 (`ocr.py`의 `RuntimeError` 메시지처럼 사용자에게 그대로 노출되는 예외 메시지도 포함). `app.js`의 사용자 노출 문자열은 상단 `MSG` 객체에 모읍니다.
+- **프론트엔드는 점진적 향상만**: 모든 기능은 JS 없이 동작해야 합니다(폼 submit 버튼은 마크업에 남겨두고 `data-autosubmit`으로 change 시 자동 제출, 삭제 확인은 `form[data-confirm]`). `app.js`의 각 `initX()`는 자기 DOM 훅이 없으면 조용히 반환하므로 한 파일이 전 페이지를 커버합니다 — 새 기능도 이 패턴으로 추가하세요. POST 요청은 `postForm(url, params)` 헬퍼(JSON 파싱 + `res.ok` 검사 + `data.detail` 에러 메시지)를 쓰고, 클라이언트 오류 배너는 `showError()`로 띄웁니다(서버 flash와 동일한 `.toast` 마크업). 편의성 실패(출처 사이트 추측 등)는 배너 없이 삼킵니다.

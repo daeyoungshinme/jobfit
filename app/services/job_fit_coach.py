@@ -95,9 +95,7 @@ def build_coaching(resume_skills: list[str], job: JobPosting, *, resume_text: st
     gaps = _group_missing_by_category(match.missing_required, match.missing_preferred)
     owned_by_category = _owned_skills_by_category(resume_skills, {gap.category for gap in gaps})
     suggestions = _build_suggestions(gaps, owned_by_category)
-    general_review = [
-        CoachingSuggestion(**item) for item in review_resume(resume_text, len(resume_skills))
-    ]
+    general_review = review_resume(resume_text, len(resume_skills))
     return CoachingResult(
         match=match,
         category_gaps=gaps,

@@ -1,4 +1,5 @@
 from app.models import JobPosting
+from app.schemas import CoachingSuggestion
 from app.services.job_fit_coach import build_coaching
 
 
@@ -58,4 +59,5 @@ def test_build_coaching_includes_general_resume_review():
     result = build_coaching(["Python"], job, resume_text="너무 짧은 이력서")
 
     assert result.general_review
+    assert all(isinstance(s, CoachingSuggestion) for s in result.general_review)
     assert any(s.status == "warning" for s in result.general_review)

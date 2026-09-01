@@ -37,7 +37,7 @@ def compute_match(resume_skills: list[str], job: JobPosting) -> MatchResult:
         company=job.company,
         url=job.url or "",
         source_site=job.source_site or "",
-        status=getattr(job, "status", "") or "",
+        status=job.status or "",
         score=round(score, 1),
         has_skill_data=has_skill_data,
         matched_required=matched_req,

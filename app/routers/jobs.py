@@ -8,6 +8,8 @@ from app.constants import (
     JOB_NOT_FOUND_DETAIL,
     JOB_STATUS_DEFAULT,
     JOB_STATUSES,
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_MESSAGE,
     POSITIONS,
     REGIONS,
 )
@@ -155,6 +157,8 @@ def guess_source(url: str = Form("")):
 @router.post("/ocr")
 async def ocr_job_image(file: UploadFile):
     content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail=MAX_UPLOAD_MESSAGE)
     try:
         text = extract_text_from_image(content)
     except RuntimeError as exc:

@@ -54,6 +54,11 @@ FLASH_MESSAGES = {
 MATCH_REQUIRED_WEIGHT = 0.7
 MATCH_PREFERRED_WEIGHT = 0.3
 
+# Upload cap for résumé files / OCR images. Local single-user tool, so this is a
+# sanity bound against an accidental huge file, not a hardened limit.
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_MESSAGE = "파일이 너무 큽니다 (최대 10MB)."
+
 RESUME_MIN_LENGTH = 300
 RESUME_MIN_ACTION_VERB_HITS = 3
 RESUME_MIN_QUANT_HITS = 3

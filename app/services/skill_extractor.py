@@ -48,6 +48,8 @@ def term_pattern(term: str) -> re.Pattern:
     #
     # Shared with app.services.job_parser for position-keyword matching, since
     # both need the same script-aware boundary behavior.
+    # IGNORECASE here (not relying on the caller lowercasing) because job_parser
+    # feeds this raw posting text; extract_skills already lowercases both sides.
     escaped = re.escape(term)
     if _HAS_KOREAN.search(term):
         left = r"(?<![가-힣])"

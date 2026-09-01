@@ -5,7 +5,7 @@ from docx import Document
 
 
 def extract_text_from_upload(filename: str, content: bytes) -> str:
-    """Extract plain text from an uploaded PDF or DOCX resume file."""
+    """Extract plain text from an uploaded résumé file (PDF, DOCX, or TXT)."""
     lower = filename.lower()
     if lower.endswith(".pdf"):
         return _extract_pdf(content)

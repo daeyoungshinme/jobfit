@@ -19,7 +19,7 @@ _RESUME_REQUIRED_FIELD_MESSAGES = {"label": "이력서 이름을 입력해주세
 
 @router.get("/new")
 def new_resume_form(request: Request):
-    return templates.TemplateResponse("resume_new.html", {"request": request})
+    return templates.TemplateResponse(request, "resume_new.html", {"request": request})
 
 
 @router.post("/upload")
@@ -39,6 +39,7 @@ async def upload_resume(
 
     if errors:
         return templates.TemplateResponse(
+            request,
             "resume_new.html",
             {
                 "request": request,
@@ -74,6 +75,7 @@ def submit_resume_form(
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
     if errors:
         return templates.TemplateResponse(
+            request,
             "resume_new.html",
             {
                 "request": request,
@@ -107,7 +109,7 @@ def submit_resume_form(
 @router.get("")
 def list_resumes(request: Request, db: Session = Depends(get_db)):
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
-    return templates.TemplateResponse("resumes_list.html", {"request": request, "resumes": resumes})
+    return templates.TemplateResponse(request, "resumes_list.html", {"request": request, "resumes": resumes})
 
 
 @router.get("/{resume_id}")
@@ -118,6 +120,7 @@ def resume_detail(resume_id: int, request: Request, db: Session = Depends(get_db
     suggestions = review_resume(resume.raw_text, len(resume.extracted_skills or []))
     jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
     return templates.TemplateResponse(
+        request,
         "resume_detail.html",
         {"request": request, "resume": resume, "suggestions": suggestions, "jobs": jobs},
     )
@@ -128,7 +131,7 @@ def edit_resume_form(resume_id: int, request: Request, db: Session = Depends(get
     resume = db.get(Resume, resume_id)
     if resume is None:
         raise HTTPException(status_code=404, detail=RESUME_NOT_FOUND_DETAIL)
-    return templates.TemplateResponse("resume_edit.html", {"request": request, "resume": resume})
+    return templates.TemplateResponse(request, "resume_edit.html", {"request": request, "resume": resume})
 
 
 @router.post("/{resume_id}/edit")
@@ -152,6 +155,7 @@ def update_resume(
     if errors:
         resume.label = label
         return templates.TemplateResponse(
+            request,
             "resume_edit.html",
             {
                 "request": request,

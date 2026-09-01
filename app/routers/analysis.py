@@ -35,6 +35,7 @@ def dashboard(
             matches = rank_matches(selected_resume.extracted_skills or [], jobs)
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
             "request": request,
@@ -57,6 +58,7 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
 
     coaching = build_coaching(resume.extracted_skills or [], job, resume_text=resume.raw_text)
     return templates.TemplateResponse(
+        request,
         "coach.html",
         {
             "request": request,
@@ -81,6 +83,7 @@ def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
 def _render_tailor(request, resume, job, *, errors=None, values=None, status_code=200):
     coaching = build_coaching(resume.extracted_skills or [], job, resume_text=resume.raw_text)
     return templates.TemplateResponse(
+        request,
         "tailor.html",
         {
             "request": request,

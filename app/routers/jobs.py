@@ -102,6 +102,7 @@ def _persist_job(job: JobPosting, form: JobForm) -> None:
 
 def _render_job_form(request: Request, template: str, form: JobForm, errors: dict, job=None):
     return templates.TemplateResponse(
+        request,
         template,
         {
             "request": request,
@@ -119,6 +120,7 @@ def _render_job_form(request: Request, template: str, form: JobForm, errors: dic
 @router.get("/new")
 def new_job_form(request: Request):
     return templates.TemplateResponse(
+        request,
         "job_new.html",
         {
             "request": request,
@@ -207,6 +209,7 @@ def list_jobs(
     })
 
     return templates.TemplateResponse(
+        request,
         "jobs_list.html",
         {
             "request": request,
@@ -238,6 +241,7 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
     sections_detected = parse_job_posting(job.raw_text).sections_detected
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
     return templates.TemplateResponse(
+        request,
         "job_detail.html",
         {
             "request": request,
@@ -255,6 +259,7 @@ def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
     if job is None:
         raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
     return templates.TemplateResponse(
+        request,
         "job_edit.html",
         {
             "request": request,

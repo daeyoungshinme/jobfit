@@ -19,21 +19,21 @@ pytest                                       # tests/
 
 - [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, startup 시 `init_db()` 호출.
 - [app/templates.py](app/templates.py) — 공유 `Jinja2Templates` 인스턴스, `bulleted` 필터·`flash_messages` 전역 등록.
-- [app/routers/jobs.py](app/routers/jobs.py) — 채용공고 CRUD, 스킬 미리보기, OCR 업로드, 출처 사이트(source_site) 추측.
-- [app/routers/resumes.py](app/routers/resumes.py) — 이력서 업로드(PDF/DOCX/TXT)/폼 등록/수정/삭제.
-- [app/routers/analysis.py](app/routers/analysis.py) — 스킬 통계, 매칭 대시보드, 이력서-공고 매칭 코칭(`/coach`). 탭 UI는 [app/templates/_analysis_tabs.html](app/templates/_analysis_tabs.html) 부분 템플릿으로 분리되어 있음.
-- [app/services/job_parser.py](app/services/job_parser.py) — 정규식 기반 채용공고 섹션 분리(주요업무/자격요건/우대사항/복지 등).
+- [app/routers/jobs.py](app/routers/jobs.py) — 채용공고 CRUD, 스킬 미리보기, OCR 업로드, 출처 사이트(source_site) 추측, 지원 상태(`status`) 빠른 변경(`POST /jobs/{id}/status`).
+- [app/routers/resumes.py](app/routers/resumes.py) — 이력서 업로드(PDF/DOCX/TXT)/폼 등록/수정/삭제. 저장 로직은 [app/services/resume_editor.py](app/services/resume_editor.py)의 `apply_resume_content()`에 모여 있음(`analysis.py`의 맞춤 편집과 공유).
+- [app/routers/analysis.py](app/routers/analysis.py) — 매칭 대시보드(스킬 수요 랭킹 포함), 이력서-공고 코칭(`/coach`), 공고 맞춤 이력서 편집 워크스페이스(`/tailor`, [tailor.html](app/templates/tailor.html)).
+- [app/services/job_parser.py](app/services/job_parser.py) — 정규식 기반 채용공고 섹션 분리(주요업무/자격요건/우대사항). 복지·혜택 헤더는 섹션 경계(stop marker)로만 쓰고 내용은 저장하지 않음.
 - [app/services/skill_extractor.py](app/services/skill_extractor.py) — `app/data/skills_dictionary.json` 사전 기반 스킬 추출. `term_pattern()`이 스크립트별 단어 경계 규칙을 제공(아래 컨벤션 참고).
 - [app/services/matcher.py](app/services/matcher.py) — 이력서-공고 매칭 점수 계산. 가중치(`MATCH_REQUIRED_WEIGHT=0.7`, `MATCH_PREFERRED_WEIGHT=0.3`)는 [app/constants.py](app/constants.py)에 정의.
-- [app/services/job_fit_coach.py](app/services/job_fit_coach.py) — `matcher`의 매칭 결과를 바탕으로 부족 스킬을 카테고리별로 묶고(`skill_extractor.skill_category_map()` 사용) 개선 제안(`CoachingResult`)을 생성. `analysis.py`의 `/coach` 라우트에서 사용.
-- [app/services/resume_parser.py](app/services/resume_parser.py) / [resume_reviewer.py](app/services/resume_reviewer.py) — 이력서 텍스트 추출 / 규칙 기반 개선 제안.
+- [app/services/job_fit_coach.py](app/services/job_fit_coach.py) — `matcher`의 매칭 결과를 바탕으로 부족 스킬을 카테고리별로 묶고(`skill_extractor.skill_category_map()` 사용) 공고 맞춤 제안을 만들며, `resume_reviewer.review_resume()` 결과를 `CoachingResult.general_review`로 함께 담음. `analysis.py`의 `/coach`·`/tailor`에서 사용.
+- [app/services/resume_parser.py](app/services/resume_parser.py) / [resume_reviewer.py](app/services/resume_reviewer.py) / [resume_editor.py](app/services/resume_editor.py) — 이력서 파일 텍스트 추출 / 규칙 기반 범용 체크리스트 / 편집 내용 저장·스킬 재추출 공용 헬퍼.
 - [app/services/ocr.py](app/services/ocr.py) — 캡처 이미지 OCR. `pytesseract` + 로컬 Tesseract-OCR 바이너리 호출, PATH에 없으면 Windows 기본 설치 경로를 자동 탐색하고 실패 시 한국어 안내 메시지로 `RuntimeError`를 던짐.
 - [app/services/text_formatter.py](app/services/text_formatter.py) — 원문 텍스트를 글머리 기호/괄호 소제목 기준으로 escape된 HTML로 렌더링 (`bulleted` 필터의 구현체).
 - [app/services/validation.py](app/services/validation.py) — `require_fields()`로 폼 필수값 검증. 라우터들이 공통으로 재사용.
 - [app/models.py](app/models.py) — SQLAlchemy 모델 (`JobPosting`, `Resume`).
 - [app/db.py](app/db.py) — SQLite 엔진/세션, 테이블 컬럼 마이그레이션(`_migrate_table_columns()`, 현재 `JobPosting`에 적용 중).
 - [app/schemas.py](app/schemas.py) — Pydantic 응답 스키마.
-- [app/constants.py](app/constants.py) — 직무/경력/지역 목록, flash 메시지.
+- [app/constants.py](app/constants.py) — 직무/경력/지역/지원상태(`JOB_STATUSES`) 목록, 매칭 가중치, flash 메시지.
 - [app/data/skills_dictionary.json](app/data/skills_dictionary.json) — 카테고리별 스킬명+동의어 사전 (커스터마이징 가능).
 - [tools/copy_unlock/](tools/copy_unlock/) — 브라우저 전용 북마클릿/유저스크립트, 서버 코드와 무관.
 

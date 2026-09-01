@@ -496,7 +496,9 @@ button.gap-chip {
 
 .toast-success { border-left-color: var(--success-text); }
 .toast-error { border-left-color: var(--danger); }
-.toast-warning { border-left-color: var(--warning-border); }
+
+/* Submit button kept for no-JS filter/status forms; hidden once JS auto-submits. */
+.js .nojs-submit { display: none; }
 
 .form-error-banner {
   margin: 0 0 16px;

@@ -84,19 +84,4 @@
   </div>
 </div>
 
-{% if resume.source_type != "file" %}
-<script>
-  document.querySelectorAll(".gap-chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const input = document.querySelector('input[name="skills_text"]');
-      if (!input) return;
-      const skill = chip.textContent.replace(/^\+\s*/, "").trim();
-      const current = input.value.split(",").map((s) => s.trim()).filter(Boolean);
-      if (!current.includes(skill)) current.push(skill);
-      input.value = current.join(", ");
-      input.focus();
-    });
-  });
-</script>
-{% endif %}
 {% endblock %}

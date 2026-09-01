@@ -13,21 +13,23 @@
   <div class="card form-card">
     <h3>기본 정보</h3>
     <label>공고 제목
-      <input type="text" name="title" id="title" required placeholder="예: 백엔드 개발자 (5년 이상)" value="{{ v.title or '' }}" class="{{ 'field-error' if errors.title }}">
-      {% if errors.title %}<span class="field-error-text">{{ errors.title }}</span>{% endif %}
+      <input type="text" name="title" id="title" required placeholder="예: 백엔드 개발자 (5년 이상)" value="{{ v.title or '' }}" class="{{ 'field-error' if errors.title }}"
+        {% if errors.title %}aria-invalid="true" aria-describedby="title-error"{% endif %}>
+      {% if errors.title %}<span class="field-error-text" id="title-error">{{ errors.title }}</span>{% endif %}
     </label>
     <label>회사명
       <input type="text" name="company" id="company" placeholder="예: JobFit테크" value="{{ v.company or '' }}">
     </label>
     <div class="row">
       <label>직무
-        <select name="position" id="position" required class="{{ 'field-error' if errors.position }}">
+        <select name="position" id="position" required class="{{ 'field-error' if errors.position }}"
+          {% if errors.position %}aria-invalid="true" aria-describedby="position-error"{% endif %}>
           <option value="" {% if not v.position %}selected{% endif %} disabled>선택하세요</option>
           {% for p in positions %}
           <option value="{{ p }}" {% if v.position == p %}selected{% endif %}>{{ p }}</option>
           {% endfor %}
         </select>
-        {% if errors.position %}<span class="field-error-text">{{ errors.position }}</span>{% endif %}
+        {% if errors.position %}<span class="field-error-text" id="position-error">{{ errors.position }}</span>{% endif %}
       </label>
       <label>경력 조건
         <select name="experience_level" id="experience_level">
@@ -65,9 +67,10 @@
 
   <div class="card form-card">
     <h3>공고 원문 및 스킬 분석</h3>
-    <label>공고 원문 <span id="raw-text-count" class="hint-inline"></span>
-      <textarea name="raw_text" id="raw_text" rows="14" required placeholder="채용공고 전문을 붙여넣으세요 (자격요건, 우대사항 포함)" class="{{ 'field-error' if errors.raw_text }}">{{ v.raw_text or '' }}</textarea>
-      {% if errors.raw_text %}<span class="field-error-text">{{ errors.raw_text }}</span>{% endif %}
+    <label>공고 원문 <span id="raw-text-count" class="hint-inline" aria-live="polite"></span>
+      <textarea name="raw_text" id="raw_text" rows="14" required placeholder="채용공고 전문을 붙여넣으세요 (자격요건, 우대사항 포함)" class="{{ 'field-error' if errors.raw_text }}"
+        {% if errors.raw_text %}aria-invalid="true" aria-describedby="raw_text-error"{% endif %}>{{ v.raw_text or '' }}</textarea>
+      {% if errors.raw_text %}<span class="field-error-text" id="raw_text-error">{{ errors.raw_text }}</span>{% endif %}
     </label>
 
     {% if mode == "new" %}
@@ -76,12 +79,12 @@
     <div class="ocr-controls">
       <input type="file" id="ocr-file" accept="image/*" multiple>
       <button type="button" id="ocr-btn" class="btn-secondary">이미지에서 텍스트 추출</button>
-      <span id="ocr-status" class="hint-inline"></span>
+      <span id="ocr-status" class="hint-inline" aria-live="polite"></span>
     </div>
     {% endif %}
 
     <button type="button" id="preview-btn" class="btn-secondary">스킬 미리보기</button>
-    <div id="preview-result" class="preview-box" style="display:none;">
+    <div id="preview-result" class="preview-box" style="display:none;" aria-live="polite">
       <div><strong>필수 스킬</strong> <span id="preview-required"></span></div>
       <div><strong>우대 스킬</strong> <span id="preview-preferred"></span></div>
     </div>

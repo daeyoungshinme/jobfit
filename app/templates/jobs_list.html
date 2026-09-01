@@ -6,7 +6,9 @@
   <a href="/jobs/new" class="btn-primary">+ 새 공고 등록</a>
 </div>
 
-<form method="get" action="/jobs" class="card filter-bar">
+<details class="filter-details card">
+  <summary>필터{% if active_filter_count %} <span class="tag tag-source">{{ active_filter_count }}</span>{% endif %}</summary>
+  <form method="get" action="/jobs" class="filter-bar">
   <details class="filter-group" {% if filters.position %}open{% endif %}>
     <summary>직무{% if filters.position %} ({{ filters.position|length }}){% endif %}</summary>
     <div class="checkbox-list">
@@ -25,6 +27,17 @@
       <label class="checkbox-item">
         <input type="checkbox" name="experience_level" value="{{ e }}" {% if e in filters.experience_level %}checked{% endif %}>
         {{ e }}
+      </label>
+      {% endfor %}
+    </div>
+  </details>
+  <details class="filter-group" {% if filters.status %}open{% endif %}>
+    <summary>상태{% if filters.status %} ({{ filters.status|length }}){% endif %}</summary>
+    <div class="checkbox-list">
+      {% for s in statuses %}
+      <label class="checkbox-item">
+        <input type="checkbox" name="status" value="{{ s }}" {% if s in filters.status %}checked{% endif %}>
+        {{ s }}
       </label>
       {% endfor %}
     </div>
@@ -55,7 +68,8 @@
     <button type="submit" class="btn-secondary">필터 적용</button>
     <a href="/jobs" class="btn-secondary">필터 초기화</a>
   </div>
-</form>
+  </form>
+</details>
 
 {% if not jobs %}
 <p class="empty-state">등록된 채용공고가 없습니다. <a href="/jobs/new">지금 등록하기</a></p>
@@ -66,7 +80,7 @@
 <div class="card-grid">
   {% for job in jobs %}
   <a href="/jobs/{{ job.id }}" class="card job-card">
-    <h3>{{ job.title }}</h3>
+    <h3>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ job.status }}</span>{% endif %}</h3>
     <p class="meta">{{ job.company }} · {{ job.position }} {% if job.experience_level %}· {{ job.experience_level }}{% endif %}
       {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
     </p>

@@ -49,6 +49,25 @@ def test_migrate_table_columns_adds_missing_columns_once(monkeypatch):
     assert added_again is False
 
 
+def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO job_postings (title, position, raw_text, created_at) "
+                "VALUES ('기존 공고', '백엔드', 'x', '2024-01-01')"
+            )
+        )
+
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+
+    with engine.connect() as conn:
+        status = conn.execute(text("SELECT status FROM job_postings")).scalar_one()
+    assert status == "관심"
+
+
 def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)
@@ -64,11 +83,11 @@ def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
                 INSERT INTO job_postings
                     (title, company, url, position, experience_level, raw_text,
                      required_skills, preferred_skills, address, main_tasks,
-                     required_text, preferred_text, benefits, source_site, created_at)
+                     required_text, preferred_text, source_site, created_at)
                 VALUES
                     ('백엔드 개발자', '테스트회사', 'https://example.com/jobs/1', '백엔드', '3년',
                      '[주요업무]\n서비스 개발\n[자격요건]\nPython', '[]', '[]',
-                     '', '', '', '', '', '', '2024-01-01')
+                     '', '', '', '', '', '2024-01-01')
                 """
             )
         )

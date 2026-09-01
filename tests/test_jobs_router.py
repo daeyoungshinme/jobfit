@@ -123,6 +123,67 @@ def test_delete_job_missing_redirects_with_not_found_flash(client):
     assert response.headers["location"] == "/jobs?msg=job_not_found"
 
 
+def test_create_job_defaults_status_to_interest(client, db_session):
+    client.post(
+        "/jobs",
+        data={"title": "공고", "position": "백엔드 개발자", "raw_text": "[자격요건]\nPython"},
+        follow_redirects=False,
+    )
+    job = db_session.query(JobPosting).one()
+    assert job.status == "관심"
+
+
+def test_update_job_changes_status(client, db_session):
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="자격요건\nPython", status="관심")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    client.post(
+        f"/jobs/{job.id}/edit",
+        data={
+            "title": "공고",
+            "position": "백엔드 개발자",
+            "raw_text": "[자격요건]\nPython",
+            "status": "면접",
+        },
+        follow_redirects=False,
+    )
+    db_session.refresh(job)
+    assert job.status == "면접"
+
+
+def test_list_jobs_filters_by_status(client, db_session):
+    db_session.add_all([
+        JobPosting(title="관심 공고", position="백엔드 개발자", raw_text="x", status="관심"),
+        JobPosting(title="면접 공고", position="백엔드 개발자", raw_text="x", status="면접"),
+    ])
+    db_session.commit()
+
+    response = client.get("/jobs", params={"status": "면접"})
+    assert "면접 공고" in response.text
+    assert "관심 공고" not in response.text
+
+
+def test_quick_status_update_redirects_with_flash(client, db_session):
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.post(f"/jobs/{job.id}/status", data={"status": "서류합격"}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/jobs/{job.id}?msg=job_status_updated"
+    db_session.refresh(job)
+    assert job.status == "서류합격"
+
+
+def test_quick_status_update_missing_job_redirects(client):
+    response = client.post("/jobs/99999/status", data={"status": "면접"}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/jobs?msg=job_not_found"
+
+
 def test_preview_job_returns_parsed_fields(client):
     response = client.post("/jobs/preview", data={"raw_text": "[자격요건]\nPython, FastAPI 경험"})
     assert response.status_code == 200

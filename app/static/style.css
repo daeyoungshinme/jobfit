@@ -216,6 +216,19 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
   flex-wrap: wrap;
 }
 
+.filter-details > summary {
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* On wider screens the filter panel is always open and the summary toggle
+   is hidden; the collapse is a mobile-only affordance. */
+@media (min-width: 701px) {
+  .filter-details > summary { display: none; }
+  .filter-details > .filter-bar { display: flex !important; }
+}
+
 .filter-bar label {
   font-size: 0.85rem;
   font-weight: 600;
@@ -295,6 +308,21 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
 .tag-required { background: var(--required); color: var(--required-text); }
 .tag-preferred { background: var(--preferred); color: var(--preferred-text); }
 .tag-source { background: var(--border); color: var(--text-muted); }
+.tag-status { background: var(--btn-secondary-bg); color: var(--primary); }
+
+.rank-list { list-style: none; padding: 0; margin: 10px 0 0; }
+.rank-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+.rank-list li:last-child { border-bottom: none; }
+.rank-list .rank-meta { color: var(--text-muted); white-space: nowrap; }
+
+.data-table tr.row-muted td { opacity: 0.6; }
 
 .job-source-link { font-size: 0.85rem; color: var(--primary); text-decoration: none; }
 .job-source-link:hover { text-decoration: underline; }
@@ -399,6 +427,32 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
 .suggestion-ok { background: var(--ok); border-color: var(--ok-border); }
 .suggestion-warning { background: var(--warning); border-color: var(--warning-border); }
 .suggestion-info { background: var(--table-header-bg); border-color: var(--border); }
+
+.tailor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.tailor-left .card:first-child { margin-top: 0; }
+.tailor-right .card:first-child, .tailor-right .form-card:first-child { margin-top: 0; }
+
+button.gap-chip {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.mobile-jump { display: none; }
+
+@media (max-width: 900px) {
+  .tailor-grid { grid-template-columns: 1fr; }
+  .mobile-jump {
+    display: inline-block;
+    margin: 4px 0 12px;
+  }
+}
 
 .category-gap { margin-bottom: 16px; }
 .category-gap:last-child { margin-bottom: 0; }
@@ -515,8 +569,25 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
     text-align: center;
   }
 
+  .form-card textarea#raw_text {
+    min-height: 160px;
+  }
+
+  .ocr-controls .btn-secondary,
+  .form-card .btn-primary,
+  .form-card .btn-secondary {
+    width: 100%;
+    text-align: center;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
   .filter-group {
     flex: 1 1 100%;
+  }
+
+  .filter-group summary {
+    padding: 10px 0;
   }
 
   .checkbox-list {
@@ -596,5 +667,16 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
 
   .data-table .tags, .data-table .bar-track {
     justify-content: flex-end;
+  }
+
+  .data-table td[data-label="액션"] {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .data-table td[data-label="액션"] .btn-secondary {
+    flex: 1;
+    text-align: center;
   }
 }

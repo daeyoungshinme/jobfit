@@ -1,6 +1,7 @@
 from app.models import JobPosting
 from app.schemas import CategoryGap, CoachingResult, CoachingSuggestion
 from app.services.matcher import compute_match
+from app.services.resume_reviewer import review_resume
 from app.services.skill_extractor import skill_category_map
 
 _UNKNOWN_CATEGORY = "기타"
@@ -89,9 +90,17 @@ def _build_suggestions(gaps: list[CategoryGap], owned_by_category: dict[str, lis
     return suggestions
 
 
-def build_coaching(resume_skills: list[str], job: JobPosting) -> CoachingResult:
+def build_coaching(resume_skills: list[str], job: JobPosting, *, resume_text: str = "") -> CoachingResult:
     match = compute_match(resume_skills, job)
     gaps = _group_missing_by_category(match.missing_required, match.missing_preferred)
     owned_by_category = _owned_skills_by_category(resume_skills, {gap.category for gap in gaps})
     suggestions = _build_suggestions(gaps, owned_by_category)
-    return CoachingResult(match=match, category_gaps=gaps, suggestions=suggestions)
+    general_review = [
+        CoachingSuggestion(**item) for item in review_resume(resume_text, len(resume_skills))
+    ]
+    return CoachingResult(
+        match=match,
+        category_gaps=gaps,
+        suggestions=suggestions,
+        general_review=general_review,
+    )

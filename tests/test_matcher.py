@@ -31,10 +31,26 @@ def test_compute_match_partial_coverage():
     assert 0 < result.score < 100
 
 
-def test_compute_match_no_requirements_scores_full_on_that_axis():
+def test_compute_match_no_skill_data_scores_zero_and_is_flagged():
     job = make_job(1, "요건 없음", [], [])
     result = compute_match(["Python"], job)
-    assert result.score == 100.0
+    assert result.score == 0.0
+    assert result.has_skill_data is False
+
+
+def test_compute_match_preferred_only_scores_from_preferred_axis():
+    job = make_job(1, "우대만 있는 공고", [], ["Docker", "AWS"])
+    result = compute_match(["Docker"], job)
+    assert result.has_skill_data is True
+    assert result.score == 50.0
+
+
+def test_rank_matches_sinks_jobs_without_skill_data():
+    scored = make_job(1, "스킬 있음", ["Python"], [])
+    blank = make_job(2, "스킬 없음", [], [])
+    results = rank_matches(["Python"], [blank, scored])
+    assert results[0].job_id == scored.id
+    assert results[-1].job_id == blank.id
 
 
 def test_rank_matches_orders_by_score_desc():
@@ -55,3 +71,12 @@ def test_skill_ranking_counts_and_percentage():
     assert ranking["Python"].total_count == 2
     assert ranking["Docker"].preferred_count == 2
     assert ranking["Python"].percentage == round(2 / 3 * 100, 1)
+
+
+def test_skill_ranking_percentage_capped_when_skill_in_both_lists():
+    # A skill listed as both required and preferred on the same job must count
+    # as one job mention, so the percentage can never exceed 100%.
+    jobs = [make_job(1, "A", ["Python"], ["Python"])]
+    ranking = {r.name: r for r in skill_ranking(jobs)}
+    assert ranking["Python"].total_count == 2
+    assert ranking["Python"].percentage == 100.0

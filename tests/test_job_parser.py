@@ -157,9 +157,14 @@ def test_tech_stack_section_folds_into_required_skills():
     assert "Docker" not in parsed.preferred_skills
 
 
-def test_extracts_benefits_section():
+def test_benefits_section_is_not_stored_but_ends_preceding_section():
+    # 혜택/복지 is treated as a stop marker: it carries no job-fit signal so it
+    # isn't kept, but it must still close the 우대사항 section so benefit prose
+    # doesn't leak into preferred_text.
     parsed = parse_job_posting(SAMPLE_WITH_ALL_SECTIONS)
-    assert "건강검진" in parsed.benefits_text
+    assert "건강검진" not in parsed.preferred_text
+    assert "건강검진" not in parsed.required_text
+    assert not hasattr(parsed, "benefits_text")
 
 
 def test_guess_address_from_label():
@@ -217,16 +222,20 @@ def test_header_does_not_bridge_across_a_line_break():
 
 def test_header_word_inside_another_word_is_not_split():
     # "복지카드" contains "복지" as a substring but is one word, not a header.
+    # The 혜택 및 복지 section it sits under isn't stored, so the line must not
+    # surface in any tracked section either.
     parsed = parse_job_posting(REAL_WORLD_STYLE_SAMPLE)
-    assert "복지카드로 점심 식대를 지원!" in parsed.benefits_text
+    assert "복지카드로 점심 식대를 지원!" not in parsed.preferred_text
+    assert "복지카드로 점심 식대를 지원!" not in parsed.required_text
 
 
 def test_stop_header_ends_tracked_sections():
-    # "채용 전형" (and what follows: address, application steps) is not one
-    # of the tracked sections and must not leak into benefits_text.
+    # "혜택 및 복지" / "채용 전형" (and what follows: address, application steps)
+    # are not tracked sections and must not leak into preferred_text.
     parsed = parse_job_posting(REAL_WORLD_STYLE_SAMPLE)
-    assert "서류전형" not in parsed.benefits_text
-    assert "테헤란로" not in parsed.benefits_text
+    assert "Spark 활용 경험" in parsed.preferred_text
+    assert "서류전형" not in parsed.preferred_text
+    assert "테헤란로" not in parsed.preferred_text
 
 
 def test_guess_title_skips_leading_metadata_line():
@@ -396,53 +405,6 @@ def test_bracket_tip_block_does_not_bleed_into_preferred_section():
     assert "네트워크 및 인프라에 대한 기본적인 이해가 있으신 분" in parsed.preferred_text
 
 
-BENEFITS_SECTION_WITH_CATEGORY_SUBHEADINGS_SAMPLE = """
-혜택 및 복지
-[아낌없는 보상과 복지 혜택 제공]
-• 점심식사를 제공합니다. 든든하게 일하세요!
-• 분기별로 복지몰 포인트를 지급드립니다. (연간 80만원 상당)
-• 스톡옵션 지급을 통해 회사의 성장과 함께합니다.
-• 장기 근속자분들을 위한 포상을 지급합니다.
-• 업무에 필요한 도서를 무제한 지원하고 있습니다.
-• 지인추천 포상금제도로 좋은 분은 언제든지 추천해주세요.
-• 야근 시 저녁 식대와 택시비를 지원합니다.
-• 경조금과 경조휴가를 지원합니다.
-
-[업무에 몰입할 수 있는 환경]
-• 근무시간 10:00~ 19:00
-• 금요일은 가족과 함께! 1시간 빨리 퇴근합니다.
-• 자유로운 연차 사용 가능합니다.
-• 최신형 윈도우/맥북 장비를 제공합니다.
-• 언제든 편안한 휴식이 가능한 안마의자가 있습니다.
-• 커피머신 이용과 함께 스낵, 음료가 무제한으로 제공됩니다.
-
-[함께 일하는 환경]
-• 팀원과 함께 할 수 있는 회식비를 지원합니다.
-• 사내 동아리 활동비를 지원합니다.
-채용 전형
-• 서류전형 - 1차면접(실무진) - 2차면접(임원진) - 입사
-"""
-
-
-def test_benefits_section_with_bracket_category_subheadings_is_not_dropped():
-    # Regression: "[아낌없는 보상과 복지 혜택 제공]" etc. are category
-    # sub-headings *within* the 혜택 및 복지 section (text_formatter renders
-    # them as <h4>), not boilerplate notes. They used to be misread as an
-    # implicit stop marker, closing the section immediately and silently
-    # dropping every bullet that followed.
-    parsed = parse_job_posting(BENEFITS_SECTION_WITH_CATEGORY_SUBHEADINGS_SAMPLE)
-    assert "점심식사를 제공합니다" in parsed.benefits_text
-    assert "스톡옵션 지급을 통해" in parsed.benefits_text
-    assert "안마의자가 있습니다" in parsed.benefits_text
-    assert "사내 동아리 활동비를 지원합니다" in parsed.benefits_text
-    # The sub-heading text itself should survive too, since text_formatter
-    # renders it as a heading rather than dropping it.
-    assert "아낌없는 보상과 복지 혜택 제공" in parsed.benefits_text
-    assert "업무에 몰입할 수 있는 환경" in parsed.benefits_text
-    # The real 채용 전형 stop header still ends the section as before.
-    assert "서류전형" not in parsed.benefits_text
-
-
 def test_normalize_newlines_collapses_crlf_and_cr():
     assert normalize_newlines("a\r\nb\rc\nd") == "a\nb\nc\nd"
 
@@ -457,4 +419,4 @@ def test_split_sections_survives_crlf_line_endings():
     assert "데이터 파이프라인 설계 및 운영 지원" in parsed.main_tasks_text
     assert parsed.required_text.startswith("• Kafka 기반 Streaming 시스템 이해")
     assert "Spark 활용 경험" in parsed.preferred_text
-    assert "복지카드로 점심 식대를 지원!" in parsed.benefits_text
+    assert "복지카드로 점심 식대를 지원!" not in parsed.preferred_text

@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% block title %}매칭 대시보드 - JobFit{% endblock %}
 {% block content %}
-{% from "_analysis_tabs.html" import analysis_tabs %}
-{{ analysis_tabs("dashboard") }}
 <h1>매칭 대시보드</h1>
 <p class="hint">이력서를 선택하면 등록된 채용공고와의 매칭 점수, 부족한 스킬, 지원 우선순위를 확인할 수 있습니다.</p>
 
@@ -25,6 +23,20 @@
   </label>
 </form>
 
+{% if ranking %}
+<details class="card">
+  <summary><strong>이 조건에서 많이 요구되는 스킬 Top 10</strong> <span class="hint-inline">({{ job_count }}개 공고 기준)</span></summary>
+  <ul class="rank-list">
+    {% for r in ranking[:10] %}
+    <li>
+      <span class="rank-name">{{ loop.index }}. {{ r.name }}</span>
+      <span class="rank-meta">필수 {{ r.required_count }} · 우대 {{ r.preferred_count }} · {{ r.percentage }}%</span>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+
 {% if not resumes %}
 <p class="empty-state">등록된 이력서가 없습니다. <a href="/resumes/new">지금 등록하기</a></p>
 {% elif not selected_resume %}
@@ -32,15 +44,18 @@
 {% elif not matches %}
 <p class="empty-state">비교할 채용공고가 없습니다. <a href="/jobs/new">채용공고를 등록</a>해 보세요.</p>
 {% else %}
-<p class="hint">{{ matches|length }}개 공고 중 최고 매칭 점수는 <strong>{{ matches[0].score }}점</strong> ({{ matches[0].job_title }})입니다.</p>
+{% set scored = matches|selectattr("has_skill_data")|list %}
+{% if scored %}
+<p class="hint">{{ scored|length }}개 공고 중 최고 매칭 점수는 <strong>{{ scored[0].score }}점</strong> ({{ scored[0].job_title }})입니다.</p>
+{% endif %}
 <div class="table-scroll">
 <table class="data-table">
   <thead>
-    <tr><th>우선순위</th><th>공고</th><th>매칭 점수</th><th>부족한 필수 스킬</th><th>부족한 우대 스킬</th><th>코칭</th></tr>
+    <tr><th>우선순위</th><th>공고</th><th>상태</th><th>매칭 점수</th><th>부족한 필수 스킬</th><th>부족한 우대 스킬</th><th>액션</th></tr>
   </thead>
   <tbody>
     {% for m in matches %}
-    <tr {% if loop.first %}class="row-highlight"{% endif %}>
+    <tr {% if loop.first and m.has_skill_data %}class="row-highlight"{% endif %} {% if not m.has_skill_data %}class="row-muted"{% endif %}>
       <td data-label="우선순위">{{ loop.index }}</td>
       <td data-label="공고">
         <a href="/jobs/{{ m.job_id }}">{{ m.job_title }}</a>
@@ -48,9 +63,14 @@
         {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener" class="job-source-link">원본 ↗</a>{% endif %}
         <br><span class="meta">{{ m.company }}</span>
       </td>
+      <td data-label="상태">{% if m.status %}<span class="tag tag-status">{{ m.status }}</span>{% endif %}</td>
       <td data-label="매칭 점수">
+        {% if m.has_skill_data %}
         <div class="bar-track"><div class="bar-fill" style="width: {{ m.score }}%;"></div></div>
         {{ m.score }}점
+        {% else %}
+        <span class="hint-inline">스킬 정보 없음</span>
+        {% endif %}
       </td>
       <td data-label="부족한 필수 스킬">
         {% for s in m.missing_required %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="ok-text">없음</span>{% endfor %}
@@ -58,8 +78,9 @@
       <td data-label="부족한 우대 스킬">
         {% for s in m.missing_preferred %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="ok-text">없음</span>{% endfor %}
       </td>
-      <td data-label="코칭">
-        <a href="/analysis/coach?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary">맞춤 코칭</a>
+      <td data-label="액션">
+        <a href="/analysis/tailor?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary">맞춤 편집</a>
+        <a href="/analysis/coach?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary">코칭</a>
       </td>
     </tr>
     {% endfor %}

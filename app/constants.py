@@ -20,10 +20,23 @@ EXPERIENCE_LEVELS = [
     "무관",
 ]
 
+JOB_STATUSES = [
+    "관심",
+    "지원예정",
+    "지원완료",
+    "서류합격",
+    "면접",
+    "최종합격",
+    "불합격",
+    "보류",
+]
+JOB_STATUS_DEFAULT = "관심"
+
 FLASH_MESSAGES = {
     "job_created": ("채용공고가 등록되었습니다.", "success"),
     "job_updated": ("채용공고가 수정되었습니다.", "success"),
     "job_deleted": ("채용공고가 삭제되었습니다.", "success"),
+    "job_status_updated": ("지원 상태가 변경되었습니다.", "success"),
     "resume_uploaded": ("이력서가 업로드되었습니다.", "success"),
     "resume_created": ("이력서가 등록되었습니다.", "success"),
     "resume_deleted": ("이력서가 삭제되었습니다.", "success"),

@@ -18,9 +18,13 @@ _JOB_POSTING_NEW_COLUMNS = [
     ("main_tasks", "TEXT", "''"),
     ("required_text", "TEXT", "''"),
     ("preferred_text", "TEXT", "''"),
-    ("benefits", "TEXT", "''"),
     ("source_site", "VARCHAR(100)", "''"),
+    ("status", "VARCHAR(20)", "'관심'"),
 ]
+
+# NOTE: an older jobfit.db may still carry a physical "benefits" column from a
+# previous release. SQLite can't drop columns without a table rebuild, so the
+# column is left in place and simply ignored — the model no longer maps it.
 
 
 class Base(DeclarativeBase):
@@ -78,7 +82,6 @@ def _backfill_job_postings() -> None:
             job.main_tasks = parsed.main_tasks_text
             job.required_text = parsed.required_text
             job.preferred_text = parsed.preferred_text
-            job.benefits = parsed.benefits_text
             if not job.address:
                 job.address = guess_posting_fields(job.raw_text).address
 

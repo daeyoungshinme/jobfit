@@ -16,14 +16,17 @@ _PREFERRED_HEADERS = [
     r"preferred\s*(?:qualifications?|skills?|experience)?",
     r"nice\s*to\s*have",
 ]
-_BENEFITS_HEADERS = [r"복리\s*후생", r"혜택\s*(?:및|/)?\s*복지", r"복지\s*(?:및|/)?\s*혜택", r"복지", r"혜택", r"근무\s*환경"]
 # Headers that mark a section we deliberately don't track (application process,
-# work conditions, submission docs, ...). Recognizing them lets us close
-# whatever tracked section was open instead of letting that boilerplate leak
-# into e.g. benefits_text, the way it otherwise would with no boundary.
+# work conditions, benefits, submission docs, ...). Recognizing them lets us
+# close whatever tracked section was open instead of letting that boilerplate
+# leak into e.g. preferred_text, the way it otherwise would with no boundary.
+# Benefits ("복리후생", "혜택 및 복지", 바로 뒤 "복지"/"혜택"/"근무환경") carry no
+# signal for job-fit analysis so they aren't stored as a section, but they still
+# need to end the preceding 우대/자격 section — hence they live here.
 _STOP_HEADERS = [
     r"근무\s*조건", r"채용\s*전형", r"전형\s*절차", r"채용\s*절차", r"모집\s*절차",
     r"제출\s*서류", r"지원\s*방법", r"접수\s*방법", r"지원\s*절차",
+    r"복리\s*후생", r"혜택\s*(?:및|/)?\s*복지", r"복지\s*(?:및|/)?\s*혜택", r"복지", r"혜택", r"근무\s*환경",
 ]
 
 _HEADER_PATTERN = re.compile(
@@ -31,12 +34,11 @@ _HEADER_PATTERN = re.compile(
     "|(?P<tech_stack>" + "|".join(_TECH_STACK_HEADERS) + ")"
     "|(?P<required>" + "|".join(_REQUIRED_HEADERS) + ")"
     "|(?P<preferred>" + "|".join(_PREFERRED_HEADERS) + ")"
-    "|(?P<benefits>" + "|".join(_BENEFITS_HEADERS) + ")"
     "|(?P<stop>" + "|".join(_STOP_HEADERS) + ")",
     re.IGNORECASE,
 )
 
-_SECTION_LABELS = ("main_tasks", "tech_stack", "required", "preferred", "benefits")
+_SECTION_LABELS = ("main_tasks", "tech_stack", "required", "preferred")
 
 # Characters that only ever decorate a header line ("[자격요건]", "■ 우대사항",
 # "혜택 및 복지 :") — stripped from both ends before checking whether the line
@@ -74,9 +76,9 @@ _INLINE_HEADER_SEPARATOR_PATTERN = re.compile(r"\s*[:：\-–—]\s*")
 # Bracket lines *without* a note/tip keyword are deliberately left alone
 # (not treated as a boundary) because postings just as commonly use the
 # same bracket convention for category sub-headings *within* a section
-# ("[아낌없는 보상과 복지 혜택 제공]" inside 혜택 및 복지, followed by more
-# bullets of that same section) — treating every bracket line as a stop
-# would close the section immediately and drop everything after it.
+# ("[플랫폼 개발]" inside 주요업무, followed by more bullets of that same
+# section) — treating every bracket line as a stop would close the section
+# immediately and drop everything after it.
 # text_formatter.render_bulleted_html() already renders such a line as an
 # <h4> sub-heading, so leaving it as ordinary section content is what the
 # rest of the app expects.
@@ -151,7 +153,6 @@ class ParsedJobPosting:
     main_tasks_text: str
     required_text: str
     preferred_text: str
-    benefits_text: str
     sections_detected: bool
 
 
@@ -259,7 +260,6 @@ def parse_job_posting(raw_text: str) -> ParsedJobPosting:
         main_tasks_text=sections["main_tasks"].strip(),
         required_text=required_text.strip(),
         preferred_text=preferred_text.strip(),
-        benefits_text=sections["benefits"].strip(),
         sections_detected=sections_detected,
     )
 

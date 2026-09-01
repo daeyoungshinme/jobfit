@@ -97,7 +97,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if (!value) return;
           const el = document.getElementById(id);
           if (!el) return;
-          if (el.tagName === "SELECT" && !Array.from(el.options).some((o) => o.value === value)) return;
+          if (el.tagName === "SELECT" && !Array.from(el.options).some((o) => o.value === value)) {
+            // e.g. an experience range like "3년 이상" that isn't one of the
+            // preset options — add it so the guess isn't silently dropped.
+            el.add(new Option(value, value, true, true));
+          }
           el.value = value;
         });
       } finally {

@@ -28,7 +28,7 @@
 </div>
 
 <div class="card">
-  <h3>이력서 보완 가이드</h3>
+  <h3>이 공고 맞춤 보완 가이드</h3>
   <ul class="suggestion-list">
     {% for s in coaching.suggestions %}
     <li class="suggestion suggestion-{{ 'ok' if s.status == 'ok' else ('warning' if s.status == 'warning' else 'info') }}">
@@ -42,6 +42,21 @@
   </ul>
 </div>
 
-<p class="hint">이력서 전반에 대한 일반 체크리스트(길이, 항목 구성, 정량 성과 등)는
-  <a href="/resumes/{{ resume.id }}">이력서 상세 페이지</a>에서 확인하세요.</p>
+<div class="card">
+  <h3>이력서 일반 체크리스트</h3>
+  <p class="hint">특정 공고와 무관하게 이력서 전반(분량, 항목 구성, 정량 성과, 액션 동사 등)을 점검합니다.</p>
+  <ul class="suggestion-list">
+    {% for s in coaching.general_review %}
+    <li class="suggestion suggestion-{{ s.status }}">
+      <span class="badge">{{ "✓" if s.status == "ok" else "!" }}</span>
+      <div>
+        <strong>{{ s.title }}</strong>
+        <p>{{ s.detail }}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+<p><a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">이 공고에 맞춰 이력서 편집하기</a></p>
 {% endblock %}

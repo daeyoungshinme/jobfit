@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import JobPosting, Resume
+from app.services.resume_editor import apply_resume_content, compose_form_raw_text
 from app.services.resume_parser import extract_text_from_upload
 from app.services.resume_reviewer import review_resume
 from app.services.skill_extractor import extract_skill_names
@@ -24,10 +25,6 @@ def _build_resume(*, label: str, source_type: str, raw_text: str, structured: di
         structured=structured,
         extracted_skills=extract_skill_names(raw_text),
     )
-
-
-def _compose_form_raw_text(career: str, projects: str, education: str, skills_text: str) -> str:
-    return f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
 
 
 @router.get("/new")
@@ -103,7 +100,7 @@ def submit_resume_form(
             status_code=422,
         )
 
-    raw_text = _compose_form_raw_text(career, projects, education, skills_text)
+    raw_text = compose_form_raw_text(career, projects, education, skills_text)
     resume = _build_resume(
         label=label,
         source_type="form",
@@ -187,17 +184,14 @@ def update_resume(
         )
 
     resume.label = label
-    if resume.source_type == "file":
-        resume.raw_text = raw_text
-    else:
-        resume.raw_text = _compose_form_raw_text(career, projects, education, skills_text)
-        resume.structured = {
-            "career": career,
-            "projects": projects,
-            "education": education,
-            "skills_text": skills_text,
-        }
-    resume.extracted_skills = extract_skill_names(resume.raw_text)
+    apply_resume_content(
+        resume,
+        raw_text=raw_text,
+        career=career,
+        projects=projects,
+        education=education,
+        skills_text=skills_text,
+    )
     db.commit()
     return RedirectResponse(url=f"/resumes/{resume_id}?msg=resume_updated", status_code=303)
 

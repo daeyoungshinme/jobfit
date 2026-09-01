@@ -51,3 +51,11 @@ def test_build_coaching_suggestions_lead_with_summary_counts():
     assert summary.status == "warning"
     assert "필수 스킬 2개" in summary.title
     assert "우대 스킬 1개" in summary.title
+
+
+def test_build_coaching_includes_general_resume_review():
+    job = make_job(1, ["Python"], [])
+    result = build_coaching(["Python"], job, resume_text="너무 짧은 이력서")
+
+    assert result.general_review
+    assert any(s.status == "warning" for s in result.general_review)

@@ -1,4 +1,4 @@
-{% macro job_form(mode, action, submit_label, positions, experience_levels, job=None, values=None, errors=None) %}
+{% macro job_form(mode, action, submit_label, positions, experience_levels, statuses, job=None, values=None, errors=None) %}
 {% set errors = errors or {} %}
 {% set v = job or values or {} %}
 {% if mode == "new" %}
@@ -38,6 +38,13 @@
           {% if v.experience_level and v.experience_level not in experience_levels %}
           <option value="{{ v.experience_level }}" selected>{{ v.experience_level }} (기존 값)</option>
           {% endif %}
+        </select>
+      </label>
+      <label>지원 상태
+        <select name="status" id="status">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if (v.status or '관심') == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
         </select>
       </label>
     </div>

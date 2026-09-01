@@ -3,7 +3,13 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.constants import EXPERIENCE_LEVELS, POSITIONS, REGIONS
+from app.constants import (
+    EXPERIENCE_LEVELS,
+    JOB_STATUS_DEFAULT,
+    JOB_STATUSES,
+    POSITIONS,
+    REGIONS,
+)
 from app.db import get_db
 from app.models import JobPosting, Resume
 from app.services.job_parser import (
@@ -36,6 +42,7 @@ def _apply_job_fields(
     source_site: str,
     position: str,
     experience_level: str,
+    status: str,
     raw_text: str,
 ) -> None:
     job.title = title
@@ -45,6 +52,7 @@ def _apply_job_fields(
     job.source_site = source_site.strip() or guess_source_site(url)
     job.position = position
     job.experience_level = experience_level
+    job.status = status or JOB_STATUS_DEFAULT
     job.raw_text = raw_text
 
 
@@ -52,7 +60,6 @@ def _apply_parsed_sections(job: JobPosting, parsed: ParsedJobPosting) -> None:
     job.main_tasks = parsed.main_tasks_text
     job.required_text = parsed.required_text
     job.preferred_text = parsed.preferred_text
-    job.benefits = parsed.benefits_text
     job.required_skills = parsed.required_skills
     job.preferred_skills = parsed.preferred_skills
 
@@ -61,7 +68,12 @@ def _apply_parsed_sections(job: JobPosting, parsed: ParsedJobPosting) -> None:
 def new_job_form(request: Request):
     return templates.TemplateResponse(
         "job_new.html",
-        {"request": request, "positions": POSITIONS, "experience_levels": EXPERIENCE_LEVELS},
+        {
+            "request": request,
+            "positions": POSITIONS,
+            "experience_levels": EXPERIENCE_LEVELS,
+            "statuses": JOB_STATUSES,
+        },
     )
 
 
@@ -106,6 +118,7 @@ def create_job(
     source_site: str = Form(""),
     position: str = Form(""),
     experience_level: str = Form(""),
+    status: str = Form(""),
     raw_text: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -120,6 +133,7 @@ def create_job(
                 "request": request,
                 "positions": POSITIONS,
                 "experience_levels": EXPERIENCE_LEVELS,
+                "statuses": JOB_STATUSES,
                 "errors": errors,
                 "values": {
                     "title": title,
@@ -129,6 +143,7 @@ def create_job(
                     "source_site": source_site,
                     "position": position,
                     "experience_level": experience_level,
+                    "status": status,
                     "raw_text": raw_text,
                 },
             },
@@ -147,6 +162,7 @@ def create_job(
         source_site=source_site,
         position=position,
         experience_level=experience_level,
+        status=status,
         raw_text=raw_text,
     )
     _apply_parsed_sections(job, parsed)
@@ -163,6 +179,7 @@ def list_jobs(
     skill: list[str] = Query([]),
     experience_level: list[str] = Query([]),
     region: list[str] = Query([]),
+    status: list[str] = Query([]),
     db: Session = Depends(get_db),
 ):
     all_jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
@@ -172,6 +189,8 @@ def list_jobs(
         jobs = [j for j in jobs if j.position in position]
     if experience_level:
         jobs = [j for j in jobs if j.experience_level in experience_level]
+    if status:
+        jobs = [j for j in jobs if j.status in status]
     if skill:
         jobs = [
             j for j in jobs
@@ -193,14 +212,18 @@ def list_jobs(
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
             "regions": REGIONS,
+            "statuses": JOB_STATUSES,
             "all_skills": all_skills,
             "filters": {
                 "position": position,
                 "skill": skill,
                 "experience_level": experience_level,
                 "region": region,
+                "status": status,
             },
-            "active_filter_count": len(position) + len(skill) + len(experience_level) + len(region),
+            "active_filter_count": (
+                len(position) + len(skill) + len(experience_level) + len(region) + len(status)
+            ),
         },
     )
 
@@ -214,7 +237,13 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
     return templates.TemplateResponse(
         "job_detail.html",
-        {"request": request, "job": job, "sections_detected": sections_detected, "resumes": resumes},
+        {
+            "request": request,
+            "job": job,
+            "sections_detected": sections_detected,
+            "resumes": resumes,
+            "statuses": JOB_STATUSES,
+        },
     )
 
 
@@ -225,7 +254,13 @@ def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="공고를 찾을 수 없습니다")
     return templates.TemplateResponse(
         "job_edit.html",
-        {"request": request, "job": job, "positions": POSITIONS, "experience_levels": EXPERIENCE_LEVELS},
+        {
+            "request": request,
+            "job": job,
+            "positions": POSITIONS,
+            "experience_levels": EXPERIENCE_LEVELS,
+            "statuses": JOB_STATUSES,
+        },
     )
 
 
@@ -240,6 +275,7 @@ def update_job(
     source_site: str = Form(""),
     position: str = Form(""),
     experience_level: str = Form(""),
+    status: str = Form(""),
     raw_text: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -261,6 +297,7 @@ def update_job(
             source_site=source_site,
             position=position,
             experience_level=experience_level,
+            status=status,
             raw_text=raw_text,
         )
         return templates.TemplateResponse(
@@ -270,6 +307,7 @@ def update_job(
                 "job": job,
                 "positions": POSITIONS,
                 "experience_levels": EXPERIENCE_LEVELS,
+                "statuses": JOB_STATUSES,
                 "errors": errors,
             },
             status_code=422,
@@ -286,11 +324,23 @@ def update_job(
         source_site=source_site,
         position=position,
         experience_level=experience_level,
+        status=status,
         raw_text=raw_text,
     )
     _apply_parsed_sections(job, parsed)
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_updated", status_code=303)
+
+
+@router.post("/{job_id}/status")
+def update_job_status(job_id: int, status: str = Form(...), db: Session = Depends(get_db)):
+    job = db.get(JobPosting, job_id)
+    if job is None:
+        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
+    if status in JOB_STATUSES:
+        job.status = status
+        db.commit()
+    return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_updated", status_code=303)
 
 
 @router.post("/{job_id}/delete")

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} 맞춤 이력서 편집 - JobFit{% endblock %}
+{% block content %}
+{% from "_resume_fields.html" import resume_fields %}
+<a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
+<h1>{{ job.title }} 맞춤 이력서 편집</h1>
+<p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})
+  · <a href="/analysis/coach?resume_id={{ resume.id }}&job_id={{ job.id }}">전체 코칭 보기</a></p>
+
+<div class="card">
+  <h3>매칭 점수</h3>
+  {% if coaching.match.has_skill_data %}
+  <div class="bar-track"><div class="bar-fill" style="width: {{ coaching.match.score }}%;"></div></div>
+  {{ coaching.match.score }}점
+  {% else %}
+  <span class="hint">이 공고에서 인식된 스킬이 없어 점수를 계산할 수 없습니다.</span>
+  {% endif %}
+</div>
+
+<a href="#resume-editor" class="back-link mobile-jump">이력서 편집으로 ↓</a>
+
+<div class="tailor-grid">
+  <div class="tailor-left">
+    <div class="card">
+      <h3>공고 요구 스킬</h3>
+      <p class="hint">부족한 스킬을 누르면 오른쪽 "보유 기술 스킬" 입력란에 추가됩니다.</p>
+      <h4>필수</h4>
+      <div class="tags">
+        {% for s in coaching.match.matched_required %}<span class="tag tag-preferred">✓ {{ s }}</span>{% endfor %}
+        {% for s in coaching.match.missing_required %}<button type="button" class="tag tag-required gap-chip">+ {{ s }}</button>{% endfor %}
+        {% if not coaching.match.matched_required and not coaching.match.missing_required %}<span class="empty-state">인식된 필수 스킬 없음</span>{% endif %}
+      </div>
+      <h4>우대</h4>
+      <div class="tags">
+        {% for s in coaching.match.matched_preferred %}<span class="tag tag-preferred">✓ {{ s }}</span>{% endfor %}
+        {% for s in coaching.match.missing_preferred %}<button type="button" class="tag tag-preferred gap-chip">+ {{ s }}</button>{% endfor %}
+        {% if not coaching.match.matched_preferred and not coaching.match.missing_preferred %}<span class="empty-state">인식된 우대 스킬 없음</span>{% endif %}
+      </div>
+    </div>
+
+    {% if coaching.category_gaps %}
+    <div class="card">
+      <h3>부족한 스킬 (카테고리별)</h3>
+      {% for g in coaching.category_gaps %}
+      <div class="category-gap">
+        <h4>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h4>
+        <div class="tags">
+          {% for s in g.required_missing %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
+          {% for s in g.preferred_missing %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if job.required_text or job.preferred_text %}
+    <details class="card">
+      <summary><strong>공고 자격요건 · 우대사항 원문</strong></summary>
+      {% if job.required_text %}<h4>자격요건</h4><div class="section-text">{{ job.required_text|bulleted }}</div>{% endif %}
+      {% if job.preferred_text %}<h4>우대사항</h4><div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
+    </details>
+    {% endif %}
+  </div>
+
+  <div class="tailor-right" id="resume-editor">
+    <form method="post" action="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}">
+      {% if resume.source_type == "file" %}
+      <div class="card form-card">
+        <h3>이력서 원문</h3>
+        <p class="hint">파일 업로드로 등록된 이력서는 원문 텍스트를 직접 수정합니다. 저장 시 기술 스킬을 다시 인식합니다.</p>
+        <label>원문
+          <textarea name="raw_text" rows="18" required>{{ resume.raw_text }}</textarea>
+        </label>
+      </div>
+      {% else %}
+      {{ resume_fields(values=structured) }}
+      {% endif %}
+      <button type="submit" class="btn-primary">저장하고 매칭 다시 계산</button>
+    </form>
+  </div>
+</div>
+
+{% if resume.source_type != "file" %}
+<script>
+  document.querySelectorAll(".gap-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const input = document.querySelector('input[name="skills_text"]');
+      if (!input) return;
+      const skill = chip.textContent.replace(/^\+\s*/, "").trim();
+      const current = input.value.split(",").map((s) => s.trim()).filter(Boolean);
+      if (!current.includes(skill)) current.push(skill);
+      input.value = current.join(", ");
+      input.focus();
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

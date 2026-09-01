@@ -3,11 +3,12 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import MAX_UPLOAD_BYTES, MAX_UPLOAD_MESSAGE, RESUME_NOT_FOUND_DETAIL
 from app.db import get_db
 from app.models import JobPosting, Resume
+from app.services.resume_editor import apply_resume_content, new_resume, validate_resume_content
 from app.services.resume_parser import extract_text_from_upload
 from app.services.resume_reviewer import review_resume
-from app.services.skill_extractor import extract_skill_names
 from app.services.validation import require_fields
 from app.templates import templates
 
@@ -16,23 +17,9 @@ router = APIRouter(prefix="/resumes", tags=["resumes"])
 _RESUME_REQUIRED_FIELD_MESSAGES = {"label": "이력서 이름을 입력해주세요."}
 
 
-def _build_resume(*, label: str, source_type: str, raw_text: str, structured: dict) -> Resume:
-    return Resume(
-        label=label,
-        source_type=source_type,
-        raw_text=raw_text,
-        structured=structured,
-        extracted_skills=extract_skill_names(raw_text),
-    )
-
-
-def _compose_form_raw_text(career: str, projects: str, education: str, skills_text: str) -> str:
-    return f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
-
-
 @router.get("/new")
 def new_resume_form(request: Request):
-    return templates.TemplateResponse("resume_new.html", {"request": request})
+    return templates.TemplateResponse(request, "resume_new.html", {"request": request})
 
 
 @router.post("/upload")
@@ -45,13 +32,17 @@ async def upload_resume(
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
     content = await file.read()
     raw_text = ""
-    try:
-        raw_text = extract_text_from_upload(file.filename, content)
-    except ValueError as exc:
-        errors["file"] = str(exc)
+    if len(content) > MAX_UPLOAD_BYTES:
+        errors["file"] = MAX_UPLOAD_MESSAGE
+    else:
+        try:
+            raw_text = extract_text_from_upload(file.filename, content)
+        except ValueError as exc:
+            errors["file"] = str(exc)
 
     if errors:
         return templates.TemplateResponse(
+            request,
             "resume_new.html",
             {
                 "request": request,
@@ -62,7 +53,7 @@ async def upload_resume(
             status_code=422,
         )
 
-    resume = _build_resume(
+    resume = new_resume(
         label=label,
         source_type="file",
         raw_text=raw_text,
@@ -87,6 +78,7 @@ def submit_resume_form(
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
     if errors:
         return templates.TemplateResponse(
+            request,
             "resume_new.html",
             {
                 "request": request,
@@ -103,17 +95,13 @@ def submit_resume_form(
             status_code=422,
         )
 
-    raw_text = _compose_form_raw_text(career, projects, education, skills_text)
-    resume = _build_resume(
+    resume = new_resume(
         label=label,
         source_type="form",
-        raw_text=raw_text,
-        structured={
-            "career": career,
-            "projects": projects,
-            "education": education,
-            "skills_text": skills_text,
-        },
+        career=career,
+        projects=projects,
+        education=education,
+        skills_text=skills_text,
     )
     db.add(resume)
     db.commit()
@@ -124,17 +112,18 @@ def submit_resume_form(
 @router.get("")
 def list_resumes(request: Request, db: Session = Depends(get_db)):
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
-    return templates.TemplateResponse("resumes_list.html", {"request": request, "resumes": resumes})
+    return templates.TemplateResponse(request, "resumes_list.html", {"request": request, "resumes": resumes})
 
 
 @router.get("/{resume_id}")
 def resume_detail(resume_id: int, request: Request, db: Session = Depends(get_db)):
     resume = db.get(Resume, resume_id)
     if resume is None:
-        raise HTTPException(status_code=404, detail="이력서를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail=RESUME_NOT_FOUND_DETAIL)
     suggestions = review_resume(resume.raw_text, len(resume.extracted_skills or []))
     jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
     return templates.TemplateResponse(
+        request,
         "resume_detail.html",
         {"request": request, "resume": resume, "suggestions": suggestions, "jobs": jobs},
     )
@@ -144,8 +133,8 @@ def resume_detail(resume_id: int, request: Request, db: Session = Depends(get_db
 def edit_resume_form(resume_id: int, request: Request, db: Session = Depends(get_db)):
     resume = db.get(Resume, resume_id)
     if resume is None:
-        raise HTTPException(status_code=404, detail="이력서를 찾을 수 없습니다")
-    return templates.TemplateResponse("resume_edit.html", {"request": request, "resume": resume})
+        raise HTTPException(status_code=404, detail=RESUME_NOT_FOUND_DETAIL)
+    return templates.TemplateResponse(request, "resume_edit.html", {"request": request, "resume": resume})
 
 
 @router.post("/{resume_id}/edit")
@@ -162,14 +151,14 @@ def update_resume(
 ):
     resume = db.get(Resume, resume_id)
     if resume is None:
-        raise HTTPException(status_code=404, detail="이력서를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail=RESUME_NOT_FOUND_DETAIL)
 
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
-    if resume.source_type == "file":
-        errors.update(require_fields({"raw_text": raw_text}, {"raw_text": "이력서 원문을 입력해주세요."}))
+    errors.update(validate_resume_content(resume.source_type, raw_text=raw_text))
     if errors:
         resume.label = label
         return templates.TemplateResponse(
+            request,
             "resume_edit.html",
             {
                 "request": request,
@@ -187,17 +176,14 @@ def update_resume(
         )
 
     resume.label = label
-    if resume.source_type == "file":
-        resume.raw_text = raw_text
-    else:
-        resume.raw_text = _compose_form_raw_text(career, projects, education, skills_text)
-        resume.structured = {
-            "career": career,
-            "projects": projects,
-            "education": education,
-            "skills_text": skills_text,
-        }
-    resume.extracted_skills = extract_skill_names(resume.raw_text)
+    apply_resume_content(
+        resume,
+        raw_text=raw_text,
+        career=career,
+        projects=projects,
+        education=education,
+        skills_text=skills_text,
+    )
     db.commit()
     return RedirectResponse(url=f"/resumes/{resume_id}?msg=resume_updated", status_code=303)
 

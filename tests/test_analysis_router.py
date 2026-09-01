@@ -1,12 +1,7 @@
 from app.models import JobPosting, Resume
 
 
-def test_skill_stats_with_no_jobs(client):
-    response = client.get("/analysis/skills")
-    assert response.status_code == 200
-
-
-def test_skill_stats_ranks_skills_across_jobs(client, db_session):
+def test_dashboard_skill_ranking_lists_skills_across_jobs(client, db_session):
     job = JobPosting(
         title="백엔드 개발자 채용",
         position="백엔드 개발자",
@@ -17,12 +12,13 @@ def test_skill_stats_ranks_skills_across_jobs(client, db_session):
     db_session.add(job)
     db_session.commit()
 
-    response = client.get("/analysis/skills")
+    response = client.get("/analysis/dashboard")
     assert response.status_code == 200
+    assert "많이 요구되는 스킬" in response.text
     assert "Python" in response.text
 
 
-def test_skill_stats_filters_by_position(client, db_session):
+def test_dashboard_skill_ranking_respects_position_filter(client, db_session):
     job = JobPosting(
         title="백엔드 개발자 채용",
         position="백엔드 개발자",
@@ -32,9 +28,13 @@ def test_skill_stats_filters_by_position(client, db_session):
     db_session.add(job)
     db_session.commit()
 
-    response = client.get("/analysis/skills", params={"position": "프론트엔드 개발자"})
+    response = client.get("/analysis/dashboard", params={"position": "프론트엔드 개발자"})
     assert response.status_code == 200
     assert "Python" not in response.text
+
+
+def test_skills_route_is_gone(client):
+    assert client.get("/analysis/skills").status_code == 404
 
 
 def test_dashboard_with_no_data(client):
@@ -63,6 +63,8 @@ def test_dashboard_computes_matches_for_selected_resume(client, db_session):
     response = client.get("/analysis/dashboard", params={"resume_id": resume.id})
     assert response.status_code == 200
     assert "백엔드 개발자 채용" in response.text
+    # status column renders the job's application status
+    assert "관심" in response.text
 
 
 def test_dashboard_with_unknown_resume_id_shows_no_matches(client):

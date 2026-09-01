@@ -2,23 +2,43 @@
 {% block title %}{{ job.title }} - JobFit{% endblock %}
 {% block content %}
 <a href="/jobs" class="back-link">&larr; 목록으로</a>
-<h1>{{ job.title }}</h1>
+<h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ job.status }}</span>{% endif %}</h1>
 <p class="meta">{{ job.company }} · {{ job.position }} {% if job.experience_level %}· {{ job.experience_level }}{% endif %}
   {% if job.address %} · {{ job.address }}{% endif %}
   {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
   {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener">원본 공고 보기</a>{% endif %}
 </p>
 
+<form method="post" action="/jobs/{{ job.id }}/status" class="card filter-bar">
+  <label>지원 상태
+    <select name="status" data-autosubmit>
+      {% for s in statuses %}<option value="{{ s }}" {% if job.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn-secondary nojs-submit">변경</button>
+</form>
+
 {% if resumes %}
 <div class="card filter-bar">
   <form method="get" action="/analysis/coach">
     <input type="hidden" name="job_id" value="{{ job.id }}">
-    <label>이 공고에 대한 맞춤 코칭
-      <select name="resume_id" onchange="this.form.submit()">
+    <label>이 공고에 맞춰 코칭 받기
+      <select name="resume_id" data-autosubmit>
         <option value="0">이력서를 선택하세요</option>
         {% for r in resumes %}<option value="{{ r.id }}">{{ r.label }}</option>{% endfor %}
       </select>
     </label>
+    <button type="submit" class="btn-secondary nojs-submit">이동</button>
+  </form>
+  <form method="get" action="/analysis/tailor">
+    <input type="hidden" name="job_id" value="{{ job.id }}">
+    <label>이 공고에 맞춰 이력서 편집
+      <select name="resume_id" data-autosubmit>
+        <option value="0">이력서를 선택하세요</option>
+        {% for r in resumes %}<option value="{{ r.id }}">{{ r.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn-secondary nojs-submit">이동</button>
   </form>
 </div>
 {% endif %}
@@ -47,20 +67,13 @@
   {% if job.preferred_text %}<div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
 </div>
 
-{% if job.benefits %}
-<div class="card">
-  <h3>혜택 및 복지</h3>
-  <div class="section-text">{{ job.benefits|bulleted }}</div>
-</div>
-{% endif %}
-
 <details class="card" {% if not sections_detected %}open{% endif %}>
-  <summary><h3 style="display:inline">원문{% if not sections_detected %} (자동 인식 실패 — 여기서 확인하세요){% endif %}</h3></summary>
+  <summary><strong>원문{% if not sections_detected %} (자동 인식 실패 — 여기서 확인하세요){% endif %}</strong></summary>
   <pre class="raw-text">{{ job.raw_text }}</pre>
 </details>
 
 <a href="/jobs/{{ job.id }}/edit" class="btn-secondary">수정</a>
-<form method="post" action="/jobs/{{ job.id }}/delete" onsubmit="return confirm('이 채용공고를 삭제할까요?');">
+<form method="post" action="/jobs/{{ job.id }}/delete" data-confirm="이 채용공고를 삭제할까요?">
   <button type="submit" class="btn-danger">삭제</button>
 </form>
 {% endblock %}

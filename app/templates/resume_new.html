@@ -16,12 +16,12 @@
 <div id="file-tab" class="tab-panel {{ 'active' if active_tab == 'file-tab' }}" role="tabpanel" aria-labelledby="file-tab-btn">
   <form method="post" action="/resumes/upload" enctype="multipart/form-data" class="card form-card">
     <label>이력서 이름
-      <input type="text" name="label" required placeholder="예: 2026년 8월 버전" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}">
+      <input type="text" name="label" required placeholder="예: 2026년 8월 버전" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}" {% if errors.label %}aria-invalid="true"{% endif %}>
       {% if errors.label %}<span class="field-error-text">{{ errors.label }}</span>{% endif %}
     </label>
     <label>파일 (PDF, DOCX, TXT)
-      <input type="file" name="file" accept=".pdf,.docx,.txt" required class="{{ 'field-error' if errors.file }}">
-      {% if errors.file %}<span class="field-error-text">{{ errors.file }}</span>{% endif %}
+      <input type="file" name="file" accept=".pdf,.docx,.txt" required class="{{ 'field-error' if errors.file }}" {% if errors.file %}aria-invalid="true" aria-describedby="file-error"{% endif %}>
+      {% if errors.file %}<span class="field-error-text" id="file-error">{{ errors.file }}</span>{% endif %}
     </label>
     <button type="submit" class="btn-primary">업로드</button>
   </form>
@@ -32,7 +32,7 @@
     <div class="card form-card">
       <h3>기본 정보</h3>
       <label>이력서 이름
-        <input type="text" name="label" required placeholder="예: 백엔드 지원용" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}">
+        <input type="text" name="label" required placeholder="예: 백엔드 지원용" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}" {% if errors.label %}aria-invalid="true"{% endif %}>
         {% if errors.label %}<span class="field-error-text">{{ errors.label }}</span>{% endif %}
       </label>
     </div>

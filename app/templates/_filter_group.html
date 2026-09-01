@@ -1,0 +1,13 @@
+{% macro filter_group(name, label, options, selected) %}
+<details class="filter-group" {% if selected %}open{% endif %}>
+  <summary>{{ label }}{% if selected %} ({{ selected|length }}){% endif %}</summary>
+  <div class="checkbox-list">
+    {% for opt in options %}
+    <label class="checkbox-item">
+      <input type="checkbox" name="{{ name }}" value="{{ opt }}" {% if opt in selected %}checked{% endif %}>
+      {{ opt }}
+    </label>
+    {% endfor %}
+  </div>
+</details>
+{% endmacro %}

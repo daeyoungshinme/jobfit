@@ -1,8 +1,0 @@
-{% macro analysis_tabs(active) %}
-<div class="tabs" role="tablist" aria-label="분석 보기 전환">
-  <a role="tab" aria-selected="{{ 'true' if active == 'dashboard' else 'false' }}"
-     class="tab-btn {{ 'active' if active == 'dashboard' }}" href="/analysis/dashboard">매칭 대시보드</a>
-  <a role="tab" aria-selected="{{ 'true' if active == 'skills' else 'false' }}"
-     class="tab-btn {{ 'active' if active == 'skills' }}" href="/analysis/skills">스킬 통계</a>
-</div>
-{% endmacro %}

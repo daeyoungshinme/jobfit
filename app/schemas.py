@@ -7,7 +7,9 @@ class MatchResult(BaseModel):
     company: str
     url: str
     source_site: str
+    status: str = ""
     score: float
+    has_skill_data: bool = True
     matched_required: list[str]
     missing_required: list[str]
     matched_preferred: list[str]
@@ -39,3 +41,4 @@ class CoachingResult(BaseModel):
     match: MatchResult
     category_gaps: list[CategoryGap]
     suggestions: list[CoachingSuggestion]
+    general_review: list[CoachingSuggestion] = []

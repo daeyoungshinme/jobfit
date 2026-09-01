@@ -18,9 +18,18 @@ _JOB_POSTING_NEW_COLUMNS = [
     ("main_tasks", "TEXT", "''"),
     ("required_text", "TEXT", "''"),
     ("preferred_text", "TEXT", "''"),
-    ("benefits", "TEXT", "''"),
     ("source_site", "VARCHAR(100)", "''"),
+    ("status", "VARCHAR(20)", "'관심'"),
 ]
+
+# NOTE: an older jobfit.db may still carry a physical "benefits" column from a
+# previous release. SQLite can't drop columns without a table rebuild, so the
+# column is left in place and simply ignored — the model no longer maps it.
+
+# Same pattern as _JOB_POSTING_NEW_COLUMNS, for the `resumes` table. Empty for
+# now — the wiring exists so a future Resume column just needs an entry here
+# (plus a dedicated backfill call in init_db() if existing rows must be filled).
+_RESUME_NEW_COLUMNS: list[tuple[str, str, str]] = []
 
 
 class Base(DeclarativeBase):
@@ -35,7 +44,7 @@ def get_db():
         db.close()
 
 
-def _migrate_table_columns(table_name: str, columns: list[tuple[str, str, str]]) -> bool:
+def _migrate_table_columns(table_name: str, columns: list[tuple[str, str, str]]) -> None:
     """Add any columns in `columns` missing from `table_name` in an existing jobfit.db.
 
     `columns` is a list of (column, DDL type, default literal) tuples, e.g.
@@ -43,11 +52,9 @@ def _migrate_table_columns(table_name: str, columns: list[tuple[str, str, str]])
     the ALTER TABLE statement, so it must match the column's DDL type (e.g.
     "0" for an INTEGER column, "''" for TEXT/VARCHAR).
 
-    Returns True if at least one column was added (i.e. this is an upgrade
-    from an older schema, not a fresh database), so the caller knows whether
-    a backfill pass over existing rows is needed. Reused for any table that
-    grows new columns after its initial release — see _JOB_POSTING_NEW_COLUMNS
-    for the pattern to follow when Resume needs the same treatment.
+    Idempotent — only ALTERs columns that are actually missing. Reused for any
+    table that grows new columns after its initial release; see
+    _JOB_POSTING_NEW_COLUMNS / _RESUME_NEW_COLUMNS for the pattern.
     """
     with engine.connect() as conn:
         existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table_name})"))}
@@ -58,7 +65,6 @@ def _migrate_table_columns(table_name: str, columns: list[tuple[str, str, str]])
                 added = True
         if added:
             conn.commit()
-        return added
 
 
 def _backfill_job_postings() -> None:
@@ -78,7 +84,6 @@ def _backfill_job_postings() -> None:
             job.main_tasks = parsed.main_tasks_text
             job.required_text = parsed.required_text
             job.preferred_text = parsed.preferred_text
-            job.benefits = parsed.benefits_text
             if not job.address:
                 job.address = guess_posting_fields(job.raw_text).address
 
@@ -95,6 +100,7 @@ def init_db():
 
     Base.metadata.create_all(bind=engine)
     _migrate_table_columns("job_postings", _JOB_POSTING_NEW_COLUMNS)
+    _migrate_table_columns("resumes", _RESUME_NEW_COLUMNS)
     # Always re-run: the backfill query itself is idempotent (only touches rows
     # with required_text == ""), so this also self-heals rows left over from a
     # prior run that added the columns but failed partway through backfilling.

@@ -44,7 +44,7 @@ def test_tailor_post_reextracts_skills_and_shrinks_gap(client, db_session, job_f
     assert "Kafka" in resume.extracted_skills
 
     followup = client.get("/analysis/tailor", params={"resume_id": resume.id, "job_id": job.id})
-    assert "+ Kafka" not in followup.text  # no longer rendered as a missing-skill chip
+    assert 'gap-chip">+ Kafka' not in followup.text  # no longer rendered as a missing-skill chip
 
 
 def test_tailor_post_file_resume_updates_raw_text_only(client, db_session, job_factory, resume_factory):

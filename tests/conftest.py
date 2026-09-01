@@ -43,6 +43,24 @@ def client(db_session):
 
 
 @pytest.fixture()
+def make_job():
+    """비영속 JobPosting 빌더 — compute_match 등 순수 서비스 함수 테스트용 (DB 불필요)."""
+    def _make(id, title, required, preferred, position="백엔드 개발자"):
+        job = JobPosting(
+            title=title,
+            company="테스트",
+            position=position,
+            raw_text="",
+            required_skills=required,
+            preferred_skills=preferred,
+        )
+        job.id = id
+        return job
+
+    return _make
+
+
+@pytest.fixture()
 def job_factory(db_session):
     """Persist a JobPosting; keyword args override the defaults."""
     def _make(**overrides):

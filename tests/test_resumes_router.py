@@ -47,21 +47,16 @@ def test_submit_resume_form_success_redirects_to_detail(client, db_session):
     assert "Python" in resume.extracted_skills
 
 
-def test_list_resumes_returns_200(client, db_session):
-    resume = Resume(label="테스트 이력서", source_type="form", raw_text="Python 백엔드 개발")
-    db_session.add(resume)
-    db_session.commit()
+def test_list_resumes_returns_200(client, resume_factory):
+    resume_factory(raw_text="Python 백엔드 개발")
 
     response = client.get("/resumes")
     assert response.status_code == 200
     assert "테스트 이력서" in response.text
 
 
-def test_delete_resume_success_redirects_with_flash(client, db_session):
-    resume = Resume(label="삭제될 이력서", source_type="form", raw_text="내용")
-    db_session.add(resume)
-    db_session.commit()
-    db_session.refresh(resume)
+def test_delete_resume_success_redirects_with_flash(client, db_session, resume_factory):
+    resume = resume_factory(label="삭제될 이력서", raw_text="내용")
 
     response = client.post(f"/resumes/{resume.id}/delete", follow_redirects=False)
     assert response.status_code == 303
@@ -85,33 +80,15 @@ def test_update_resume_404_when_missing(client):
     assert response.status_code == 404
 
 
-def test_update_resume_missing_label_returns_422(client, db_session):
-    resume = Resume(
-        label="원래 이름",
-        source_type="form",
-        raw_text="[경력]\nPython 개발",
-        structured={"career": "Python 개발", "projects": "", "education": "", "skills_text": "Python"},
-        extracted_skills=["Python"],
-    )
-    db_session.add(resume)
-    db_session.commit()
-    db_session.refresh(resume)
+def test_update_resume_missing_label_returns_422(client, resume_factory):
+    resume = resume_factory(label="원래 이름")
 
     response = client.post(f"/resumes/{resume.id}/edit", data={"label": ""})
     assert response.status_code == 422
 
 
-def test_update_resume_form_source_success_persists_changes(client, db_session):
-    resume = Resume(
-        label="원래 이름",
-        source_type="form",
-        raw_text="[경력]\nPython 개발",
-        structured={"career": "Python 개발", "projects": "", "education": "", "skills_text": "Python"},
-        extracted_skills=["Python"],
-    )
-    db_session.add(resume)
-    db_session.commit()
-    db_session.refresh(resume)
+def test_update_resume_form_source_success_persists_changes(client, db_session, resume_factory):
+    resume = resume_factory(label="원래 이름")
 
     response = client.post(
         f"/resumes/{resume.id}/edit",
@@ -133,17 +110,13 @@ def test_update_resume_form_source_success_persists_changes(client, db_session):
     assert "Docker" in resume.extracted_skills
 
 
-def test_update_resume_file_source_edits_raw_text(client, db_session):
-    resume = Resume(
+def test_update_resume_file_source_edits_raw_text(client, db_session, resume_factory):
+    resume = resume_factory(
         label="파일 이력서",
         source_type="file",
         raw_text="Python 백엔드 개발",
         structured={"original_filename": "resume.pdf"},
-        extracted_skills=["Python"],
     )
-    db_session.add(resume)
-    db_session.commit()
-    db_session.refresh(resume)
 
     response = client.post(
         f"/resumes/{resume.id}/edit",
@@ -158,17 +131,13 @@ def test_update_resume_file_source_edits_raw_text(client, db_session):
     assert resume.structured == {"original_filename": "resume.pdf"}
 
 
-def test_update_resume_file_source_missing_raw_text_returns_422(client, db_session):
-    resume = Resume(
+def test_update_resume_file_source_missing_raw_text_returns_422(client, resume_factory):
+    resume = resume_factory(
         label="파일 이력서",
         source_type="file",
         raw_text="Python 백엔드 개발",
         structured={"original_filename": "resume.pdf"},
-        extracted_skills=["Python"],
     )
-    db_session.add(resume)
-    db_session.commit()
-    db_session.refresh(resume)
 
     response = client.post(
         f"/resumes/{resume.id}/edit",

@@ -8,7 +8,7 @@
 <div class="card">
   <h3>인식된 기술 스킬 ({{ resume.extracted_skills|length }}개)</h3>
   <div class="tags">
-    {% for s in resume.extracted_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">인식된 스킬 없음</span>{% endfor %}
+    {% for s in resume.extracted_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_SKILLS }}</span>{% endfor %}
   </div>
 </div>
 
@@ -18,7 +18,7 @@
   <summary><strong>이력서 일반 체크리스트</strong>
     {% if warning_count %}<span class="tag tag-required">{{ warning_count }}건 확인 필요</span>{% else %}<span class="tag tag-preferred">모두 양호</span>{% endif %}
   </summary>
-  <p class="hint">공고별 맞춤 코칭은 아래 "특정 공고에 맞춰 코칭"에서 확인하세요.</p>
+  <p class="hint">공고별 맞춤 코칭은 아래 "이 공고로 코칭"에서 확인하세요.</p>
   {{ suggestion_list(suggestions) }}
 </details>
 
@@ -31,9 +31,9 @@
 <div class="card filter-bar">
   <form method="get" action="/analysis/tailor">
     <input type="hidden" name="resume_id" value="{{ resume.id }}">
-    <label>특정 공고에 맞춰 이력서 편집
+    <label>이 공고로 맞춤 편집
       <select name="job_id" data-autosubmit>
-        <option value="0">공고를 선택하세요</option>
+        <option value="0">{{ SELECT_JOB_PLACEHOLDER }}</option>
         {% for j in jobs %}<option value="{{ j.id }}">{{ j.title }} ({{ j.company }})</option>{% endfor %}
       </select>
     </label>
@@ -41,9 +41,9 @@
   </form>
   <form method="get" action="/analysis/coach">
     <input type="hidden" name="resume_id" value="{{ resume.id }}">
-    <label>특정 공고에 맞춰 코칭 받기
+    <label>이 공고로 코칭
       <select name="job_id" data-autosubmit>
-        <option value="0">공고를 선택하세요</option>
+        <option value="0">{{ SELECT_JOB_PLACEHOLDER }}</option>
         {% for j in jobs %}<option value="{{ j.id }}">{{ j.title }} ({{ j.company }})</option>{% endfor %}
       </select>
     </label>

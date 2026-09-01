@@ -22,9 +22,9 @@
 <div class="card filter-bar">
   <form method="get" action="/analysis/coach">
     <input type="hidden" name="job_id" value="{{ job.id }}">
-    <label>이 공고에 맞춰 코칭 받기
+    <label>이 이력서로 코칭
       <select name="resume_id" data-autosubmit>
-        <option value="0">이력서를 선택하세요</option>
+        <option value="0">{{ SELECT_RESUME_PLACEHOLDER }}</option>
         {% for r in resumes %}<option value="{{ r.id }}">{{ r.label }}</option>{% endfor %}
       </select>
     </label>
@@ -32,9 +32,9 @@
   </form>
   <form method="get" action="/analysis/tailor">
     <input type="hidden" name="job_id" value="{{ job.id }}">
-    <label>이 공고에 맞춰 이력서 편집
+    <label>이 이력서로 맞춤 편집
       <select name="resume_id" data-autosubmit>
-        <option value="0">이력서를 선택하세요</option>
+        <option value="0">{{ SELECT_RESUME_PLACEHOLDER }}</option>
         {% for r in resumes %}<option value="{{ r.id }}">{{ r.label }}</option>{% endfor %}
       </select>
     </label>
@@ -57,12 +57,12 @@
 <div class="card">
   <h3>필수 스킬</h3>
   <div class="tags">
-    {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">인식된 필수 스킬 없음</span>{% endfor %}
+    {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_REQUIRED_SKILLS }}</span>{% endfor %}
   </div>
   {% if job.required_text %}<div class="section-text">{{ job.required_text|bulleted }}</div>{% endif %}
   <h3>우대 스킬</h3>
   <div class="tags">
-    {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="empty-state">인식된 우대 스킬 없음</span>{% endfor %}
+    {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_PREFERRED_SKILLS }}</span>{% endfor %}
   </div>
   {% if job.preferred_text %}<div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
 </div>

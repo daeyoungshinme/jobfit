@@ -19,7 +19,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const MSG = {
   analyzing: "분석 중...",
-  noSkills: "인식된 스킬 없음",
+  // constants.py의 EMPTY_REQUIRED_SKILLS / EMPTY_PREFERRED_SKILLS와 동일하게 유지.
+  noRequiredSkills: "인식된 필수 스킬 없음",
+  noPreferredSkills: "인식된 우대 스킬 없음",
   ocrOne: "인식 중...",
   ocrBatch: (i, n) => `이미지 ${i}/${n} 처리 중...`,
   ocrDoneOne: "텍스트 추출 완료",
@@ -167,9 +169,9 @@ function initSkillPreview() {
       const required = data.required_skills || [];
       const preferred = data.preferred_skills || [];
       document.getElementById("preview-required").textContent =
-        required.length ? required.join(", ") : MSG.noSkills;
+        required.length ? required.join(", ") : MSG.noRequiredSkills;
       document.getElementById("preview-preferred").textContent =
-        preferred.length ? preferred.join(", ") : MSG.noSkills;
+        preferred.length ? preferred.join(", ") : MSG.noPreferredSkills;
       document.getElementById("preview-result").style.display = "block";
 
       autoFillIds.forEach((id) => {

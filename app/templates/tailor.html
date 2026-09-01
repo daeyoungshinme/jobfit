@@ -21,13 +21,13 @@
       <div class="tags">
         {% for s in coaching.match.matched_required %}<span class="tag tag-preferred">✓ {{ s }}</span>{% endfor %}
         {% for s in coaching.match.missing_required %}<button type="button" class="tag tag-required gap-chip">+ {{ s }}</button>{% endfor %}
-        {% if not coaching.match.matched_required and not coaching.match.missing_required %}<span class="empty-state">인식된 필수 스킬 없음</span>{% endif %}
+        {% if not coaching.match.matched_required and not coaching.match.missing_required %}<span class="empty-state">{{ EMPTY_REQUIRED_SKILLS }}</span>{% endif %}
       </div>
       <h4>우대</h4>
       <div class="tags">
         {% for s in coaching.match.matched_preferred %}<span class="tag tag-preferred">✓ {{ s }}</span>{% endfor %}
         {% for s in coaching.match.missing_preferred %}<button type="button" class="tag tag-preferred gap-chip">+ {{ s }}</button>{% endfor %}
-        {% if not coaching.match.matched_preferred and not coaching.match.missing_preferred %}<span class="empty-state">인식된 우대 스킬 없음</span>{% endif %}
+        {% if not coaching.match.matched_preferred and not coaching.match.missing_preferred %}<span class="empty-state">{{ EMPTY_PREFERRED_SKILLS }}</span>{% endif %}
       </div>
     </div>
 

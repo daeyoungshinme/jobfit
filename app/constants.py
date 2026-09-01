@@ -37,6 +37,21 @@ JOB_STATUS_DEFAULT = "관심"
 JOB_NOT_FOUND_DETAIL = "존재하지 않는 채용공고입니다."
 RESUME_NOT_FOUND_DETAIL = "존재하지 않는 이력서입니다."
 
+# 빈 상태(empty state) 문구 — templates.py에서 Jinja 전역으로 등록해 템플릿이 공유.
+# app/static/app.js의 MSG.noRequiredSkills / noPreferredSkills도 같은 문자열로 유지할 것.
+EMPTY_SKILLS = "인식된 스킬 없음"
+EMPTY_REQUIRED_SKILLS = "인식된 필수 스킬 없음"
+EMPTY_PREFERRED_SKILLS = "인식된 우대 스킬 없음"
+NO_SKILL_DATA = "스킬 정보 없음"
+
+# select 안내 옵션 문구
+SELECT_RESUME_PLACEHOLDER = "이력서를 선택하세요"
+SELECT_JOB_PLACEHOLDER = "공고를 선택하세요"
+
+# 기능 명칭 (진입 링크 라벨 규칙: "{선택 대상}(으)로 {기능}")
+FEATURE_TAILOR = "맞춤 이력서 편집"
+FEATURE_COACH = "맞춤 이력서 코칭"
+
 FLASH_MESSAGES = {
     "job_created": ("채용공고가 등록되었습니다.", "success"),
     "job_updated": ("채용공고가 수정되었습니다.", "success"),

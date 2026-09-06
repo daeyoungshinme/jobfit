@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+# 경고를 에러로 승격해 현재의 "경고 0" 상태를 회귀 방지선으로 고정한다.
+# 통제 불가한 서드파티 경고가 새로 생기면 아래에 좁은 ignore 규칙을 주석과 함께 추가.
+filterwarnings = ["error"]

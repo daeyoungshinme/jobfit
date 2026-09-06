@@ -136,8 +136,11 @@ def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
     db_module._backfill_job_postings()
 
     with engine.connect() as conn:
-        row = conn.execute(text("SELECT required_text, source_site FROM job_postings")).one()
+        row = conn.execute(
+            text("SELECT required_text, source_site, required_skills FROM job_postings")
+        ).one()
     assert row[0] != ""
+    assert "Python" in row[2]  # skills re-extracted, not left as the stale '[]'
     filled_required_text = row[0]
 
     db_module._backfill_job_postings()

@@ -20,13 +20,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const MSG = {
   analyzing: "분석 중...",
-  noSkills: "인식된 스킬 없음",
+  // constants.py의 EMPTY_REQUIRED_SKILLS / EMPTY_PREFERRED_SKILLS와 동일하게 유지.
+  noRequiredSkills: "인식된 필수 스킬 없음",
+  noPreferredSkills: "인식된 우대 스킬 없음",
   ocrOne: "인식 중...",
   ocrBatch: (i, n) => `이미지 ${i}/${n} 처리 중...`,
   ocrDoneOne: "텍스트 추출 완료",
   ocrDoneBatch: (n) => `${n}개 이미지 텍스트 추출 완료`,
   requestFailed: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
 };
+
+// Fade `el` out after `delay` ms, then remove it (300ms matches the .toast
+// opacity transition in style.css). Shared by the server flash and showError.
+function fadeOutAndRemove(el, delay) {
+  setTimeout(() => {
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 300);
+  }, delay);
+}
 
 // Transient client-side error banner (server-rendered flashes use the same
 // .toast markup from base.html).
@@ -37,10 +48,7 @@ function showError(text) {
   el.textContent = text;
   const main = document.getElementById("main-content") || document.body;
   main.prepend(el);
-  setTimeout(() => {
-    el.style.opacity = "0";
-    setTimeout(() => el.remove(), 300);
-  }, 4000);
+  fadeOutAndRemove(el, 4000);
 }
 
 async function postForm(url, params) {
@@ -58,10 +66,7 @@ function initToast() {
   const url = new URL(window.location.href);
   url.searchParams.delete("msg");
   window.history.replaceState({}, "", url);
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  fadeOutAndRemove(toast, 3000);
 }
 
 function initThemeToggle() {
@@ -168,9 +173,9 @@ function initSkillPreview() {
       const required = data.required_skills || [];
       const preferred = data.preferred_skills || [];
       document.getElementById("preview-required").textContent =
-        required.length ? required.join(", ") : MSG.noSkills;
+        required.length ? required.join(", ") : MSG.noRequiredSkills;
       document.getElementById("preview-preferred").textContent =
-        preferred.length ? preferred.join(", ") : MSG.noSkills;
+        preferred.length ? preferred.join(", ") : MSG.noPreferredSkills;
       document.getElementById("preview-result").style.display = "block";
 
       autoFillIds.forEach((id) => {

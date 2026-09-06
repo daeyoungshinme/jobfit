@@ -179,9 +179,9 @@ def _resume_signal_questions(resume: Resume) -> list[InterviewQuestion]:
     out: list[InterviewQuestion] = []
     used: set[str] = set()
     for review in reviews:
-        if review.get("status") != "warning":
+        if review.status != "warning":
             continue
-        title = review.get("title", "")
+        title = review.title
         for keyword in _SIGNAL_KEYWORDS:
             if keyword in title and keyword not in used and keyword in signal_map:
                 used.add(keyword)

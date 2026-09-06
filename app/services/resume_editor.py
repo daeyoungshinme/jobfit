@@ -1,9 +1,10 @@
 """Shared résumé-content write path.
 
-Used by both the plain résumé edit form (`resumes.py`) and the job-tailored
-editing workspace (`analysis.py::tailor`) so the two stay in lock-step on how
+Used by every résumé create/edit route — the new-résumé form and upload
+(`resumes.py`), the plain edit form (`resumes.py`), and the job-tailored
+workspace (`analysis.py::tailor`) — so they all stay in lock-step on how
 `raw_text` / `structured` are composed, how skills get re-extracted, and which
-fields are required before a write is allowed.
+fields must be non-blank before a write is allowed (`validate_resume_content`).
 """
 
 from app.models import Resume
@@ -11,23 +12,35 @@ from app.services.skill_extractor import extract_skill_names
 from app.services.validation import require_fields
 
 _RAW_TEXT_REQUIRED_MESSAGE = {"raw_text": "이력서 원문을 입력해주세요."}
+_FORM_CONTENT_REQUIRED_MESSAGE = "경력/프로젝트/학력/기술 스택 중 하나 이상은 입력해주세요."
 
 
 def compose_form_raw_text(career: str, projects: str, education: str, skills_text: str) -> str:
     return f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
 
 
-def validate_resume_content(source_type: str, *, raw_text: str = "") -> dict[str, str]:
-    """Field errors for an edited résumé, keyed by field name.
+def validate_resume_content(
+    source_type: str,
+    *,
+    raw_text: str = "",
+    career: str = "",
+    projects: str = "",
+    education: str = "",
+    skills_text: str = "",
+) -> dict[str, str]:
+    """Field errors for a written résumé, keyed by field name.
 
     File-source résumés must keep a non-blank `raw_text`; form-source résumés
-    have no required content field (only the résumé label, checked by the
-    caller). Shared by `resumes.py::update_resume` and
-    `analysis.py::save_tailored_resume` so both write paths reject the same
-    empty input instead of silently overwriting stored content.
+    must have at least one non-blank structured field so an all-blank submit
+    can't overwrite stored content with the empty `compose_form_raw_text`
+    skeleton. Shared by every résumé write path (`resumes.py::submit_resume_form`
+    / `update_resume`, `analysis.py::save_tailored_resume`) so they reject the
+    same empty input.
     """
     if source_type == "file":
         return require_fields({"raw_text": raw_text}, _RAW_TEXT_REQUIRED_MESSAGE)
+    if not (career.strip() or projects.strip() or education.strip() or skills_text.strip()):
+        return {"career": _FORM_CONTENT_REQUIRED_MESSAGE}
     return {}
 
 

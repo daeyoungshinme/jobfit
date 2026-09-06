@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ job.title }} - JobFit{% endblock %}
 {% block content %}
+{% from "_pick_target.html" import pick_target %}
+{% from "_forms.html" import delete_form %}
 <a href="/jobs" class="back-link">&larr; 목록으로</a>
 <h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ job.status }}</span>{% endif %}</h1>
 <p class="meta">{{ job.company }} · {{ job.position }} {% if job.experience_level %}· {{ job.experience_level }}{% endif %}
@@ -46,26 +48,8 @@
 
 {% if resumes %}
 <div class="card filter-bar">
-  <form method="get" action="/analysis/coach">
-    <input type="hidden" name="job_id" value="{{ job.id }}">
-    <label>이 공고에 맞춰 코칭 받기
-      <select name="resume_id" data-autosubmit>
-        <option value="0">이력서를 선택하세요</option>
-        {% for r in resumes %}<option value="{{ r.id }}">{{ r.label }}</option>{% endfor %}
-      </select>
-    </label>
-    <button type="submit" class="btn-secondary nojs-submit">이동</button>
-  </form>
-  <form method="get" action="/analysis/tailor">
-    <input type="hidden" name="job_id" value="{{ job.id }}">
-    <label>이 공고에 맞춰 이력서 편집
-      <select name="resume_id" data-autosubmit>
-        <option value="0">이력서를 선택하세요</option>
-        {% for r in resumes %}<option value="{{ r.id }}">{{ r.label }}</option>{% endfor %}
-      </select>
-    </label>
-    <button type="submit" class="btn-secondary nojs-submit">이동</button>
-  </form>
+  {{ pick_target("/analysis/coach", "job_id", job.id, "resume_id", "이 이력서로 " ~ FEATURE_COACH_SHORT, resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
+  {{ pick_target("/analysis/tailor", "job_id", job.id, "resume_id", "이 이력서로 " ~ FEATURE_TAILOR_SHORT, resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
 </div>
 {% endif %}
 
@@ -83,12 +67,12 @@
 <div class="card">
   <h3>필수 스킬</h3>
   <div class="tags">
-    {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">인식된 필수 스킬 없음</span>{% endfor %}
+    {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_REQUIRED_SKILLS }}</span>{% endfor %}
   </div>
   {% if job.required_text %}<div class="section-text">{{ job.required_text|bulleted }}</div>{% endif %}
   <h3>우대 스킬</h3>
   <div class="tags">
-    {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="empty-state">인식된 우대 스킬 없음</span>{% endfor %}
+    {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_PREFERRED_SKILLS }}</span>{% endfor %}
   </div>
   {% if job.preferred_text %}<div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
 </div>
@@ -99,7 +83,5 @@
 </details>
 
 <a href="/jobs/{{ job.id }}/edit" class="btn-secondary">수정</a>
-<form method="post" action="/jobs/{{ job.id }}/delete" data-confirm="이 채용공고를 삭제할까요?">
-  <button type="submit" class="btn-danger">삭제</button>
-</form>
+{{ delete_form("/jobs/" ~ job.id ~ "/delete", "이 채용공고를 삭제할까요?") }}
 {% endblock %}

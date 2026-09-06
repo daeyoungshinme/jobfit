@@ -6,6 +6,13 @@ def test_job_detail_404_when_missing(client):
     assert response.status_code == 404
 
 
+def test_job_detail_404_renders_styled_page_for_browsers(client):
+    response = client.get("/jobs/99999", headers={"accept": "text/html"})
+    assert response.status_code == 404
+    assert "페이지를 찾을 수 없습니다" in response.text
+    assert "존재하지 않는 채용공고입니다" in response.text
+
+
 def test_job_detail_200_when_exists(client, job_factory):
     job = job_factory(title="백엔드 개발자 채용", raw_text="자격요건\n파이썬 3년 이상")
 

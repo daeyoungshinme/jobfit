@@ -6,6 +6,12 @@ def test_resume_detail_404_when_missing(client):
     assert response.status_code == 404
 
 
+def test_resume_detail_404_renders_styled_page_for_browsers(client):
+    response = client.get("/resumes/99999", headers={"accept": "text/html"})
+    assert response.status_code == 404
+    assert "페이지를 찾을 수 없습니다" in response.text
+
+
 def test_upload_resume_without_file_returns_422(client):
     response = client.post("/resumes/upload", data={"label": "테스트 이력서"})
     assert response.status_code == 422

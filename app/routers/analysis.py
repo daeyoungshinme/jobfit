@@ -70,7 +70,13 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
 
 
 def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
-    """Shared guard for the coach/tailor routes — returns (resume, job) or a redirect."""
+    """Shared guard for the coach/tailor GET routes.
+
+    Returns (resume, job, None) or (None, None, redirect). A missing/blank
+    resume_id/job_id here means a bad query string, not a bad path, so this
+    redirects to the relevant list with a flash — unlike the detail routes
+    (`/jobs/{id}`, `/resumes/{id}`) which 404.
+    """
     resume = db.get(Resume, resume_id) if resume_id else None
     if resume is None:
         return None, None, RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)

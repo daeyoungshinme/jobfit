@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initOcr();
   initRawTextCounter();
   initGapChips();
+  initCopyButtons();
 });
 
 // --- shared helpers -------------------------------------------------------
@@ -290,6 +291,38 @@ function initRawTextCounter() {
   };
   updateCount();
   rawTextEl.addEventListener("input", updateCount);
+}
+
+// Profile page: copy a generated section's text to the clipboard.
+function initCopyButtons() {
+  const buttons = document.querySelectorAll(".copy-btn[data-copy-target]");
+  if (!buttons.length) return;
+  buttons.forEach((btn) => {
+    const defaultText = btn.textContent;
+    btn.addEventListener("click", async () => {
+      const target = document.getElementById(btn.dataset.copyTarget);
+      if (!target) return;
+      const text = target.textContent;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // execCommand fallback for non-secure contexts (e.g. a LAN-IP http:// host).
+          const range = document.createRange();
+          range.selectNodeContents(target);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          document.execCommand("copy");
+          sel.removeAllRanges();
+        }
+        btn.textContent = "복사됨 ✓";
+      } catch (e) {
+        btn.textContent = "복사 실패";
+      }
+      setTimeout(() => { btn.textContent = defaultText; }, 1500);
+    });
+  });
 }
 
 // Tailor workspace: clicking a missing-skill chip adds it to the skills input.

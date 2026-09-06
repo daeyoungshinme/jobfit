@@ -81,6 +81,34 @@ def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):
     assert status == "관심"
 
 
+def test_migrate_adds_application_columns_with_typed_defaults(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO job_postings (title, position, raw_text, created_at) "
+                "VALUES ('기존 공고', '백엔드', 'x', '2024-01-01')"
+            )
+        )
+
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+
+    with engine.connect() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(job_postings)"))}
+        assert {"applied_via", "applied_at", "applied_resume_id", "memo", "is_inbound"} <= columns
+        row = conn.execute(
+            text(
+                "SELECT applied_via, applied_at, applied_resume_id, memo, is_inbound "
+                "FROM job_postings"
+            )
+        ).one()
+    assert row[0] == "" and row[1] == "" and row[3] == ""
+    assert row[2] == 0  # INTEGER default literal, not the string "0"
+    assert not row[4]   # is_inbound defaults falsy
+
+
 def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)

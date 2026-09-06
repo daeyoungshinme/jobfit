@@ -20,6 +20,11 @@ _JOB_POSTING_NEW_COLUMNS = [
     ("preferred_text", "TEXT", "''"),
     ("source_site", "VARCHAR(100)", "''"),
     ("status", "VARCHAR(20)", "'관심'"),
+    ("applied_via", "VARCHAR(30)", "''"),
+    ("applied_at", "VARCHAR(10)", "''"),
+    ("applied_resume_id", "INTEGER", "0"),
+    ("memo", "TEXT", "''"),
+    ("is_inbound", "BOOLEAN", "0"),
 ]
 
 # NOTE: an older jobfit.db may still carry a physical "benefits" column from a

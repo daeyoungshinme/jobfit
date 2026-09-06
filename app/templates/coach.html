@@ -21,5 +21,8 @@
   {{ suggestion_list(coaching.general_review) }}
 </div>
 
-<p><a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">이 공고에 맞춰 이력서 편집하기</a></p>
+<p>
+  <a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">이 공고에 맞춰 이력서 편집하기</a>
+  <a href="/analysis/interview?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-secondary">면접 예상 질문 보기</a>
+</p>
 {% endblock %}

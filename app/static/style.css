@@ -375,6 +375,17 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
   overflow-y: auto;
 }
 
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: 400; margin: 6px 0; }
+.checkbox-label input { width: auto; }
+
+.stat-tile { text-align: center; }
+.stat-tile .stat-number { font-size: 1.8rem; font-weight: 700; margin: 0; color: var(--text); }
+.stat-tile .stat-label { color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0; }
+
+.profile-section { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.profile-section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.profile-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
 .section-text { font-size: 0.92rem; line-height: 1.6; }
 .section-text h4 { margin: 14px 0 6px; font-size: 0.92rem; }
 .section-text h4:first-child { margin-top: 0; }
@@ -427,6 +438,11 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
 .suggestion-ok { background: var(--ok); border-color: var(--ok-border); }
 .suggestion-warning { background: var(--warning); border-color: var(--warning-border); }
 .suggestion-info { background: var(--table-header-bg); border-color: var(--border); }
+
+.interview-question-list { margin: 8px 0 0; padding-left: 1.3em; }
+.interview-question-list li { margin-bottom: 10px; }
+.interview-question-list li:last-child { margin-bottom: 0; }
+.interview-question-list p { margin: 3px 0 0; }
 
 .tailor-grid {
   display: grid;

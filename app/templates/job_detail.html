@@ -9,13 +9,39 @@
   {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener">원본 공고 보기</a>{% endif %}
 </p>
 
-<form method="post" action="/jobs/{{ job.id }}/status" class="card filter-bar">
-  <label>지원 상태
-    <select name="status" data-autosubmit>
-      {% for s in statuses %}<option value="{{ s }}" {% if job.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>
+<form method="post" action="/jobs/{{ job.id }}/application" class="card">
+  <h3>지원 기록</h3>
+  <div class="filter-bar">
+    <label>지원 상태
+      <select name="status">
+        {% for s in statuses %}<option value="{{ s }}" {% if job.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>지원 채널
+      <select name="applied_via">
+        <option value="">선택 안 함</option>
+        {% for c in apply_channels %}
+        <option value="{{ c }}" {% if job.applied_via == c or (not job.applied_via and suggested_channel == c) %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>지원일
+      <input type="date" name="applied_at" value="{{ job.applied_at }}">
+    </label>
+    <label>사용한 이력서
+      <select name="applied_resume_id">
+        <option value="0">선택 안 함</option>
+        {% for r in resumes %}<option value="{{ r.id }}" {% if job.applied_resume_id == r.id %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <label>메모
+    <textarea name="memo" rows="3" placeholder="지원 경로 상세, 담당 리크루터, 마감일 등">{{ job.memo }}</textarea>
   </label>
-  <button type="submit" class="btn-secondary nojs-submit">변경</button>
+  {% if job.applied_resume_id and not applied_resume %}
+  <p class="hint">지원에 사용한 이력서(#{{ job.applied_resume_id }})가 삭제되었습니다.</p>
+  {% endif %}
+  <button type="submit" class="btn-secondary">저장</button>
 </form>
 
 {% if resumes %}

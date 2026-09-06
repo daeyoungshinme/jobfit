@@ -51,6 +51,11 @@
       </label>
     </div>
 
+    <label class="checkbox-label">
+      <input type="checkbox" name="is_inbound" value="on" {% if v.is_inbound %}checked{% endif %}>
+      헤드헌터·리크루터가 먼저 제안한 공고입니다 (인바운드)
+    </label>
+
     <details class="filter-group" {% if v.address or v.url or v.source_site %}open{% endif %}>
       <summary>추가 정보 (선택)</summary>
       <label>회사 주소

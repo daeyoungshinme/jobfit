@@ -42,3 +42,30 @@ class CoachingResult(BaseModel):
     category_gaps: list[CategoryGap]
     suggestions: list[CoachingSuggestion]
     general_review: list[CoachingSuggestion] = []
+
+
+class InterviewQuestion(BaseModel):
+    category: str
+    question: str
+    rationale: str = ""
+
+
+class InterviewQuestionGroup(BaseModel):
+    category: str
+    description: str
+    questions: list[InterviewQuestion]
+
+
+class StudyTopic(BaseModel):
+    title: str
+    detail: str
+    priority: str  # "높음" | "중간" | "기본"
+    source: str = ""
+
+
+class InterviewPrep(BaseModel):
+    match: MatchResult | None = None
+    job_linked: bool = False
+    groups: list[InterviewQuestionGroup]
+    study_topics: list[StudyTopic]
+    question_count: int = 0

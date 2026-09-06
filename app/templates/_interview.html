@@ -1,0 +1,34 @@
+{# 면접 준비 페이지 공용 렌더링 조각. #}
+
+{% macro question_groups(groups) %}
+{% for g in groups %}
+<div class="card">
+  <h3>{{ g.category }} <span class="tag tag-source">{{ g.questions|length }}문항</span></h3>
+  <p class="hint">{{ g.description }}</p>
+  <ol class="interview-question-list">
+    {% for q in g.questions %}
+    <li>
+      <strong>{{ q.question }}</strong>
+      {% if q.rationale %}<p class="hint">{{ q.rationale }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+{% endfor %}
+{% endmacro %}
+
+{% macro study_topic_list(topics) %}
+{% set pri_class = {"높음": "tag-required", "중간": "tag-preferred", "기본": "tag-source"} %}
+<ul class="suggestion-list">
+  {% for t in topics %}
+  <li class="suggestion">
+    <div>
+      <strong>{{ t.title }}</strong>
+      <span class="tag {{ pri_class.get(t.priority, 'tag-source') }}">{{ t.priority }}</span>
+      <p>{{ t.detail }}</p>
+      {% if t.source %}<p class="hint">{{ t.source }}</p>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}

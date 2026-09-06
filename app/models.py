@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -28,6 +28,15 @@ class JobPosting(Base):
     preferred_text: Mapped[str] = mapped_column(Text, default="")
     required_skills: Mapped[list] = mapped_column(JSON, default=list)
     preferred_skills: Mapped[list] = mapped_column(JSON, default=list)
+    # 지원 활동 추적. applied_at 은 사용자 입력값이라 다른 폼 필드처럼 문자열로 저장한다
+    # (ISO 'YYYY-MM-DD'). applied_resume_id 는 의도적으로 FK 가 아니다 — 0 = 없음,
+    # 참조된 이력서가 삭제돼도 템플릿이 안내 문구로 저하한다.
+    applied_via: Mapped[str] = mapped_column(String(30), default="")
+    applied_at: Mapped[str] = mapped_column(String(10), default="")
+    applied_resume_id: Mapped[int] = mapped_column(Integer, default=0)
+    memo: Mapped[str] = mapped_column(Text, default="")
+    # 헤드헌터·리크루터가 먼저 제안한 공고(리멤버/LinkedIn 인바운드)면 True.
+    is_inbound: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 

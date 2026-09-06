@@ -1,4 +1,6 @@
-from app.models import JobPosting
+from datetime import date
+
+from app.models import JobPosting, Resume
 
 
 def test_job_detail_404_when_missing(client):
@@ -213,6 +215,147 @@ def test_update_job_validation_error_keeps_submitted_values(client, db_session):
     assert "새 회사명" in response.text  # submitted value re-rendered, not the stored one
     db_session.refresh(job)
     assert job.title == "원래 제목"  # nothing persisted
+
+
+def test_update_job_application_saves_all_fields(client, db_session):
+    resume = Resume(label="지원용 이력서", source_type="form", raw_text="x", extracted_skills=[])
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
+    db_session.add_all([resume, job])
+    db_session.commit()
+    db_session.refresh(resume)
+    db_session.refresh(job)
+
+    response = client.post(
+        f"/jobs/{job.id}/application",
+        data={
+            "status": "면접",
+            "applied_via": "LinkedIn",
+            "applied_at": "2026-08-01",
+            "applied_resume_id": resume.id,
+            "memo": "리크루터 김OO",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/jobs/{job.id}?msg=job_application_saved"
+    db_session.refresh(job)
+    assert job.status == "면접"
+    assert job.applied_via == "LinkedIn"
+    assert job.applied_at == "2026-08-01"
+    assert job.applied_resume_id == resume.id
+    assert job.memo == "리크루터 김OO"
+
+
+def test_update_job_application_rejects_unknown_channel(client, db_session):
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.post(
+        f"/jobs/{job.id}/application", data={"applied_via": "이상한채널"}, follow_redirects=False
+    )
+    assert response.headers["location"] == f"/jobs/{job.id}?msg=job_application_invalid"
+    db_session.refresh(job)
+    assert job.applied_via == ""
+
+
+def test_update_job_application_rejects_bad_date(client, db_session):
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.post(
+        f"/jobs/{job.id}/application", data={"applied_at": "2026/01/01"}, follow_redirects=False
+    )
+    assert response.headers["location"] == f"/jobs/{job.id}?msg=job_application_invalid"
+
+
+def test_update_job_application_unknown_job(client):
+    response = client.post("/jobs/99999/application", data={"status": "면접"}, follow_redirects=False)
+    assert response.headers["location"] == "/jobs?msg=job_not_found"
+
+
+def test_update_job_application_stamps_today_for_applied(client, db_session):
+    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    client.post(
+        f"/jobs/{job.id}/application", data={"status": "지원완료"}, follow_redirects=False
+    )
+    db_session.refresh(job)
+    assert job.applied_at == date.today().isoformat()
+
+
+def test_job_detail_suggests_channel_from_source_site(client, db_session):
+    job = JobPosting(
+        title="공고", position="백엔드 개발자", raw_text="x", source_site="원티드"
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.get(f"/jobs/{job.id}")
+    assert response.status_code == 200
+    assert '<option value="원티드" selected>원티드</option>' in response.text
+
+
+def test_job_detail_handles_deleted_applied_resume(client, db_session):
+    job = JobPosting(
+        title="공고", position="백엔드 개발자", raw_text="x", applied_resume_id=999
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    response = client.get(f"/jobs/{job.id}")
+    assert response.status_code == 200
+    assert "삭제되었습니다" in response.text
+
+
+def test_create_job_with_inbound_checkbox(client, db_session):
+    client.post(
+        "/jobs",
+        data={
+            "title": "인바운드 공고",
+            "position": "백엔드 개발자",
+            "raw_text": "[자격요건]\nPython",
+            "is_inbound": "on",
+        },
+        follow_redirects=False,
+    )
+    job = db_session.query(JobPosting).one()
+    assert job.is_inbound is True
+
+
+def test_create_job_without_inbound_defaults_false(client, db_session):
+    client.post(
+        "/jobs",
+        data={"title": "일반 공고", "position": "백엔드 개발자", "raw_text": "[자격요건]\nPython"},
+        follow_redirects=False,
+    )
+    job = db_session.query(JobPosting).one()
+    assert job.is_inbound is False
+
+
+def test_edit_job_can_turn_inbound_off(client, db_session):
+    job = JobPosting(
+        title="공고", position="백엔드 개발자", raw_text="자격요건\nPython", is_inbound=True
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    client.post(
+        f"/jobs/{job.id}/edit",
+        data={"title": "공고", "position": "백엔드 개발자", "raw_text": "[자격요건]\nPython"},
+        follow_redirects=False,
+    )
+    db_session.refresh(job)
+    assert job.is_inbound is False
 
 
 def test_preview_job_returns_parsed_fields(client):

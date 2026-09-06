@@ -32,6 +32,36 @@ JOB_STATUSES = [
 ]
 JOB_STATUS_DEFAULT = "관심"
 
+# 지원 경로(어디를 통해 지원했는지). job_detail 의 "지원 기록" 폼에서 선택한다.
+APPLY_CHANNELS = [
+    "사람인",
+    "잡코리아",
+    "원티드",
+    "잡플래닛",
+    "LinkedIn",
+    "리멤버",
+    "회사 채용페이지",
+    "헤드헌터",
+    "지인 추천",
+    "기타",
+]
+
+# source_site(소문자) 안에 포함되면 해당 지원 채널을 기본 선택으로 추천한다.
+SOURCE_SITE_TO_CHANNEL = {
+    "사람인": "사람인",
+    "saramin": "사람인",
+    "잡코리아": "잡코리아",
+    "jobkorea": "잡코리아",
+    "원티드": "원티드",
+    "wanted": "원티드",
+    "잡플래닛": "잡플래닛",
+    "jobplanet": "잡플래닛",
+    "linkedin": "LinkedIn",
+    "링크드인": "LinkedIn",
+    "리멤버": "리멤버",
+    "remember": "리멤버",
+}
+
 # 404 detail strings for GET routes. The redirect flows use the *_not_found
 # FLASH_MESSAGES entries below; keep the wording of the two in sync.
 JOB_NOT_FOUND_DETAIL = "존재하지 않는 채용공고입니다."
@@ -43,6 +73,8 @@ FLASH_MESSAGES = {
     "job_deleted": ("채용공고가 삭제되었습니다.", "success"),
     "job_status_updated": ("지원 상태가 변경되었습니다.", "success"),
     "job_status_invalid": ("알 수 없는 지원 상태입니다.", "error"),
+    "job_application_saved": ("지원 기록이 저장되었습니다.", "success"),
+    "job_application_invalid": ("입력한 지원 정보를 확인해주세요.", "error"),
     "resume_uploaded": ("이력서가 업로드되었습니다.", "success"),
     "resume_created": ("이력서가 등록되었습니다.", "success"),
     "resume_deleted": ("이력서가 삭제되었습니다.", "success"),

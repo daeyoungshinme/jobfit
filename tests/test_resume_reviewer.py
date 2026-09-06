@@ -1,4 +1,4 @@
-from app.services.resume_reviewer import _ACTION_VERBS, review_resume
+from app.services.resume_reviewer import _ACTION_VERBS, extract_achievement_lines, review_resume
 
 
 def test_action_verbs_use_hangul_for_haegyeol():
@@ -63,6 +63,28 @@ def test_nonzero_extracted_skills_gets_ok():
     skill_suggestion = next(s for s in suggestions if "기술 스킬" in s["title"])
     assert skill_suggestion["status"] == "ok"
     assert "3개" in skill_suggestion["title"]
+
+
+def test_extract_achievement_lines_prioritises_quantified_lines():
+    text = (
+        "일반적인 담당 업무를 수행했습니다\n"
+        "결제 시스템을 개발하고 처리 시간을 30% 단축했습니다\n"
+        "회의에 참석했습니다\n"
+    )
+    lines = extract_achievement_lines(text)
+    assert lines[0] == "결제 시스템을 개발하고 처리 시간을 30% 단축했습니다"
+
+
+def test_extract_achievement_lines_blank_text_returns_empty():
+    assert extract_achievement_lines("") == []
+    assert extract_achievement_lines(None) == []
+
+
+def test_extract_achievement_lines_skips_bracket_headers():
+    text = "[경력]\n서비스 아키텍처를 설계하고 구축했습니다\n[프로젝트]\n"
+    lines = extract_achievement_lines(text)
+    assert "[경력]" not in lines
+    assert "서비스 아키텍처를 설계하고 구축했습니다" in lines
 
 
 def test_warnings_are_sorted_before_ok_suggestions():

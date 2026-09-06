@@ -11,6 +11,8 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 def nav_active_for(path: str) -> str:
     if path.startswith("/resumes"):
         return "resumes"
+    if path.startswith("/analysis/activity"):
+        return "activity"
     if path.startswith("/analysis"):
         return "analysis"
     return "jobs"

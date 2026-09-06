@@ -6,8 +6,11 @@ from sqlalchemy.orm import Session
 from app.constants import POSITIONS
 from app.db import get_db
 from app.models import JobPosting, Resume
+from app.services.activity_report import build_activity_report
+from app.services.interview_prep import build_interview_prep
 from app.services.job_fit_coach import build_coaching
 from app.services.matcher import rank_matches, skill_ranking
+from app.services.profile_exporter import build_platform_profiles
 from app.services.resume_editor import apply_resume_content, validate_resume_content
 from app.templates import templates
 
@@ -50,6 +53,37 @@ def dashboard(
     )
 
 
+@router.get("/activity")
+def activity(request: Request, db: Session = Depends(get_db)):
+    jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
+    return templates.TemplateResponse(
+        request,
+        "activity.html",
+        {"request": request, "report": build_activity_report(jobs)},
+    )
+
+
+@router.get("/profile")
+def profile(request: Request, resume_id: int = 0, db: Session = Depends(get_db)):
+    resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
+    selected_resume = db.get(Resume, resume_id) if resume_id else None
+    bundle = None
+    if selected_resume:
+        all_jobs = list(db.scalars(select(JobPosting)))
+        demand = [rank.name for rank in skill_ranking(all_jobs)]
+        bundle = build_platform_profiles(selected_resume, skill_demand=demand)
+    return templates.TemplateResponse(
+        request,
+        "profile.html",
+        {
+            "request": request,
+            "resumes": resumes,
+            "selected_resume": selected_resume,
+            "bundle": bundle,
+        },
+    )
+
+
 @router.get("/coach")
 def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
     resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
@@ -69,15 +103,45 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
     )
 
 
-def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
-    """Shared guard for the coach/tailor routes — returns (resume, job) or a redirect."""
+def _load_resume(db: Session, resume_id: int):
+    """Return (resume, redirect) — redirect set when the résumé id is missing/unknown."""
     resume = db.get(Resume, resume_id) if resume_id else None
     if resume is None:
-        return None, None, RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)
+        return None, RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)
+    return resume, None
+
+
+def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
+    """Shared guard for the coach/tailor routes — returns (resume, job) or a redirect."""
+    resume, redirect = _load_resume(db, resume_id)
+    if redirect:
+        return None, None, redirect
     job = db.get(JobPosting, job_id) if job_id else None
     if job is None:
         return None, None, RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
     return resume, job, None
+
+
+@router.get("/interview")
+def interview(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
+    resume, redirect = _load_resume(db, resume_id)
+    if redirect:
+        return redirect
+    job = db.get(JobPosting, job_id) if job_id else None
+    if job_id and job is None:
+        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
+
+    prep = build_interview_prep(resume, job)
+    return templates.TemplateResponse(
+        request,
+        "interview.html",
+        {
+            "request": request,
+            "resume": resume,
+            "job": job,
+            "prep": prep,
+        },
+    )
 
 
 def _render_tailor(request, resume, job, *, errors=None, values=None, status_code=200):

@@ -49,10 +49,24 @@
     </label>
     <button type="submit" class="btn-secondary nojs-submit">이동</button>
   </form>
+  <form method="get" action="/analysis/interview">
+    <input type="hidden" name="resume_id" value="{{ resume.id }}">
+    <label>특정 공고에 맞춰 면접 질문 받기
+      <select name="job_id" data-autosubmit>
+        <option value="0">공고를 선택하세요</option>
+        {% for j in jobs %}<option value="{{ j.id }}">{{ j.title }} ({{ j.company }})</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn-secondary nojs-submit">이동</button>
+  </form>
 </div>
 {% endif %}
 
-<p><a href="/analysis/dashboard?resume_id={{ resume.id }}" class="btn-secondary">이 이력서로 매칭 대시보드 보기</a></p>
+<p>
+  <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="btn-secondary">이 이력서로 매칭 대시보드 보기</a>
+  <a href="/analysis/interview?resume_id={{ resume.id }}" class="btn-secondary">면접 예상 질문 (일반)</a>
+  <a href="/analysis/profile?resume_id={{ resume.id }}" class="btn-secondary">플랫폼 프로필 문구 생성</a>
+</p>
 
 <a href="/resumes/{{ resume.id }}/edit" class="btn-secondary">수정</a>
 <form method="post" action="/resumes/{{ resume.id }}/delete" data-confirm="이 이력서를 삭제할까요?">

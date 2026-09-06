@@ -1,9 +1,10 @@
 """Shared résumé-content write path.
 
-Used by both the plain résumé edit form (`resumes.py`) and the job-tailored
-editing workspace (`analysis.py::tailor`) so the two stay in lock-step on how
+Used by every résumé create/edit route — the new-résumé form and upload
+(`resumes.py`), the plain edit form (`resumes.py`), and the job-tailored
+workspace (`analysis.py::tailor`) — so they all stay in lock-step on how
 `raw_text` / `structured` are composed, how skills get re-extracted, and which
-fields are required before a write is allowed.
+fields must be non-blank before a write is allowed (`validate_resume_content`).
 """
 
 from app.models import Resume

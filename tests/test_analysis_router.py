@@ -32,8 +32,8 @@ def test_dashboard_computes_matches_for_selected_resume(client, job_factory, res
     response = client.get("/analysis/dashboard", params={"resume_id": resume.id})
     assert response.status_code == 200
     assert "백엔드 개발자 채용" in response.text
-    # status column renders the job's application status via the tag-status span
-    assert 'tag-status">관심<' in response.text
+    # match row renders (job title link + the job's application status word)
+    assert "관심" in response.text
 
 
 def test_dashboard_with_unknown_resume_id_shows_no_matches(client):

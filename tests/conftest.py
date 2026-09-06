@@ -102,3 +102,20 @@ def resume_factory(db_session):
         return resume
 
     return _make
+
+
+@pytest.fixture()
+def file_resume_factory(resume_factory):
+    """Persist a file-source Resume (raw_text edited directly, not from fields)."""
+    def _make(**overrides):
+        fields = {
+            "label": "파일 이력서",
+            "source_type": "file",
+            "raw_text": "원본 텍스트 Python",
+            "structured": {"original_filename": "resume.pdf"},
+            "extracted_skills": ["Python"],
+        }
+        fields.update(overrides)
+        return resume_factory(**fields)
+
+    return _make

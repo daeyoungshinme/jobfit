@@ -3,6 +3,8 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from app.constants import JOB_STATUS_DEFAULT
+
 DB_PATH = Path(__file__).resolve().parent.parent / "jobfit.db"
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -19,7 +21,7 @@ _JOB_POSTING_NEW_COLUMNS = [
     ("required_text", "TEXT", "''"),
     ("preferred_text", "TEXT", "''"),
     ("source_site", "VARCHAR(100)", "''"),
-    ("status", "VARCHAR(20)", "'관심'"),
+    ("status", "VARCHAR(20)", f"'{JOB_STATUS_DEFAULT}'"),
 ]
 
 # NOTE: an older jobfit.db may still carry a physical "benefits" column from a

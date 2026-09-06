@@ -29,6 +29,15 @@ const MSG = {
   requestFailed: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
 };
 
+// Fade `el` out after `delay` ms, then remove it (300ms matches the .toast
+// opacity transition in style.css). Shared by the server flash and showError.
+function fadeOutAndRemove(el, delay) {
+  setTimeout(() => {
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 300);
+  }, delay);
+}
+
 // Transient client-side error banner (server-rendered flashes use the same
 // .toast markup from base.html).
 function showError(text) {
@@ -38,10 +47,7 @@ function showError(text) {
   el.textContent = text;
   const main = document.getElementById("main-content") || document.body;
   main.prepend(el);
-  setTimeout(() => {
-    el.style.opacity = "0";
-    setTimeout(() => el.remove(), 300);
-  }, 4000);
+  fadeOutAndRemove(el, 4000);
 }
 
 async function postForm(url, params) {
@@ -59,10 +65,7 @@ function initToast() {
   const url = new URL(window.location.href);
   url.searchParams.delete("msg");
   window.history.replaceState({}, "", url);
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  fadeOutAndRemove(toast, 3000);
 }
 
 function initThemeToggle() {

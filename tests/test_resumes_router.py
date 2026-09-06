@@ -132,13 +132,8 @@ def test_update_resume_form_source_success_persists_changes(client, db_session, 
     assert "Docker" in resume.extracted_skills
 
 
-def test_update_resume_file_source_edits_raw_text(client, db_session, resume_factory):
-    resume = resume_factory(
-        label="파일 이력서",
-        source_type="file",
-        raw_text="Python 백엔드 개발",
-        structured={"original_filename": "resume.pdf"},
-    )
+def test_update_resume_file_source_edits_raw_text(client, db_session, file_resume_factory):
+    resume = file_resume_factory(raw_text="Python 백엔드 개발")
 
     response = client.post(
         f"/resumes/{resume.id}/edit",
@@ -166,13 +161,8 @@ def test_update_resume_form_source_all_blank_content_returns_422(client, db_sess
     assert resume.structured["career"] == "Python 백엔드 3년"
 
 
-def test_update_resume_file_source_missing_raw_text_returns_422(client, resume_factory):
-    resume = resume_factory(
-        label="파일 이력서",
-        source_type="file",
-        raw_text="Python 백엔드 개발",
-        structured={"original_filename": "resume.pdf"},
-    )
+def test_update_resume_file_source_missing_raw_text_returns_422(client, file_resume_factory):
+    resume = file_resume_factory()
 
     response = client.post(
         f"/resumes/{resume.id}/edit",

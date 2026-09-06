@@ -48,8 +48,10 @@ def term_pattern(term: str) -> re.Pattern:
     #
     # Shared with app.services.job_parser for position-keyword matching, since
     # both need the same script-aware boundary behavior.
-    # IGNORECASE here (not relying on the caller lowercasing) because job_parser
-    # feeds this raw posting text; extract_skills already lowercases both sides.
+    # IGNORECASE is the single case-folding strategy — callers pass raw text
+    # (job_parser passes untouched posting text; extract_skills no longer
+    # pre-lowercases). Terms are still stored lowercased only so alias sets
+    # like {"JS", "js"} dedupe to one.
     escaped = re.escape(term)
     if _HAS_KOREAN.search(term):
         left = r"(?<![가-힣])"
@@ -64,14 +66,13 @@ def extract_skills(text: str) -> list[dict]:
     """Return unique skill hits found in text as [{"name": ..., "category": ...}, ...]."""
     if not text:
         return []
-    lowered = text.lower()
     hits: list[dict] = []
     seen = set()
     for entry in load_skill_entries():
         if entry.name in seen:
             continue
         for term in entry.terms:
-            if term_pattern(term).search(lowered):
+            if term_pattern(term).search(text):
                 hits.append({"name": entry.name, "category": entry.category})
                 seen.add(entry.name)
                 break

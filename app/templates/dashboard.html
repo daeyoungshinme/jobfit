@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% block title %}매칭 대시보드 - JobFit{% endblock %}
 {% block content %}
+{% from "_coaching.html" import score_bar %}
 <h1>매칭 대시보드</h1>
 <p class="hint">이력서를 선택하면 등록된 채용공고와의 매칭 점수, 부족한 스킬, 지원 우선순위를 확인할 수 있습니다.</p>
 
 <form method="get" action="/analysis/dashboard" class="card filter-bar">
   <label>이력서
     <select name="resume_id" data-autosubmit>
-      <option value="0">이력서를 선택하세요</option>
+      <option value="0">{{ SELECT_RESUME_PLACEHOLDER }}</option>
       {% for r in resumes %}
       <option value="{{ r.id }}" {% if selected_resume and selected_resume.id == r.id %}selected{% endif %}>{{ r.label }}</option>
       {% endfor %}
@@ -67,10 +68,10 @@
       <td data-label="상태">{% if m.status %}<span class="tag tag-status">{{ m.status }}</span>{% endif %}</td>
       <td data-label="매칭 점수">
         {% if m.has_skill_data %}
-        <div class="bar-track"><div class="bar-fill" style="width: {{ m.score }}%;"></div></div>
+        {{ score_bar(m.score) }}
         {{ m.score }}점
         {% else %}
-        <span class="hint-inline">스킬 정보 없음</span>
+        <span class="hint-inline">{{ NO_SKILL_DATA }}</span>
         {% endif %}
       </td>
       <td data-label="부족한 필수 스킬">
@@ -80,8 +81,8 @@
         {% for s in m.missing_preferred %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="ok-text">없음</span>{% endfor %}
       </td>
       <td data-label="액션">
-        <a href="/analysis/tailor?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary">맞춤 편집</a>
-        <a href="/analysis/coach?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary">코칭</a>
+        <a href="/analysis/tailor?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary" title="{{ FEATURE_TAILOR }}">{{ FEATURE_TAILOR_SHORT }}</a>
+        <a href="/analysis/coach?resume_id={{ selected_resume.id }}&job_id={{ m.job_id }}" class="btn-secondary" title="{{ FEATURE_COACH }}">{{ FEATURE_COACH_SHORT }}</a>
       </td>
     </tr>
     {% endfor %}

@@ -38,6 +38,7 @@
     <div class="tags">
       {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
       {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
+      {% if not job.required_skills and not job.preferred_skills %}<span class="empty-state">{{ EMPTY_SKILLS }}</span>{% endif %}
     </div>
   </a>
   {% endfor %}

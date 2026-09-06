@@ -43,6 +43,24 @@ def client(db_session):
 
 
 @pytest.fixture()
+def make_job():
+    """비영속 JobPosting 빌더 — compute_match 등 순수 서비스 함수 테스트용 (DB 불필요)."""
+    def _make(id, title, required, preferred, position="백엔드 개발자"):
+        job = JobPosting(
+            title=title,
+            company="테스트",
+            position=position,
+            raw_text="",
+            required_skills=required,
+            preferred_skills=preferred,
+        )
+        job.id = id
+        return job
+
+    return _make
+
+
+@pytest.fixture()
 def job_factory(db_session):
     """Persist a JobPosting; keyword args override the defaults."""
     def _make(**overrides):
@@ -82,5 +100,22 @@ def resume_factory(db_session):
         db_session.commit()
         db_session.refresh(resume)
         return resume
+
+    return _make
+
+
+@pytest.fixture()
+def file_resume_factory(resume_factory):
+    """Persist a file-source Resume (raw_text edited directly, not from fields)."""
+    def _make(**overrides):
+        fields = {
+            "label": "파일 이력서",
+            "source_type": "file",
+            "raw_text": "원본 텍스트 Python",
+            "structured": {"original_filename": "resume.pdf"},
+            "extracted_skills": ["Python"],
+        }
+        fields.update(overrides)
+        return resume_factory(**fields)
 
     return _make

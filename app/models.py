@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.constants import JOB_STATUS_DEFAULT
 from app.db import Base
 
 
@@ -21,7 +22,7 @@ class JobPosting(Base):
     source_site: Mapped[str] = mapped_column(String(100), default="")
     position: Mapped[str] = mapped_column(String(100))
     experience_level: Mapped[str] = mapped_column(String(50), default="")
-    status: Mapped[str] = mapped_column(String(20), default="관심")
+    status: Mapped[str] = mapped_column(String(20), default=JOB_STATUS_DEFAULT)
     raw_text: Mapped[str] = mapped_column(Text)
     main_tasks: Mapped[str] = mapped_column(Text, default="")
     required_text: Mapped[str] = mapped_column(Text, default="")

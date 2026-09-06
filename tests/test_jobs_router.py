@@ -6,11 +6,15 @@ def test_job_detail_404_when_missing(client):
     assert response.status_code == 404
 
 
-def test_job_detail_200_when_exists(client, db_session):
-    job = JobPosting(title="백엔드 개발자 채용", position="백엔드 개발자", raw_text="자격요건\n파이썬 3년 이상")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_job_detail_404_renders_styled_page_for_browsers(client):
+    response = client.get("/jobs/99999", headers={"accept": "text/html"})
+    assert response.status_code == 404
+    assert "페이지를 찾을 수 없습니다" in response.text
+    assert "존재하지 않는 채용공고입니다" in response.text
+
+
+def test_job_detail_200_when_exists(client, job_factory):
+    job = job_factory(title="백엔드 개발자 채용", raw_text="자격요건\n파이썬 3년 이상")
 
     response = client.get(f"/jobs/{job.id}")
     assert response.status_code == 200
@@ -40,20 +44,16 @@ def test_create_job_success_redirects_to_detail(client, db_session):
     assert "Python" in job.required_skills
 
 
-def test_list_jobs_returns_200(client, db_session):
-    job = JobPosting(title="백엔드 개발자 채용", position="백엔드 개발자", raw_text="자격요건\n파이썬 3년 이상")
-    db_session.add(job)
-    db_session.commit()
+def test_list_jobs_returns_200(client, job_factory):
+    job_factory(title="백엔드 개발자 채용", raw_text="자격요건\n파이썬 3년 이상")
 
     response = client.get("/jobs")
     assert response.status_code == 200
     assert "백엔드 개발자 채용" in response.text
 
 
-def test_list_jobs_filters_by_position(client, db_session):
-    job = JobPosting(title="백엔드 개발자 채용", position="백엔드 개발자", raw_text="자격요건\n파이썬 3년 이상")
-    db_session.add(job)
-    db_session.commit()
+def test_list_jobs_filters_by_position(client, job_factory):
+    job_factory(title="백엔드 개발자 채용", raw_text="자격요건\n파이썬 3년 이상")
 
     response = client.get("/jobs", params={"position": "프론트엔드 개발자"})
     assert response.status_code == 200
@@ -65,11 +65,8 @@ def test_edit_job_form_404_when_missing(client):
     assert response.status_code == 404
 
 
-def test_update_job_missing_required_fields_returns_422(client, db_session):
-    job = JobPosting(title="백엔드 개발자 채용", position="백엔드 개발자", raw_text="자격요건\n파이썬 3년 이상")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_missing_required_fields_returns_422(client, job_factory):
+    job = job_factory(title="백엔드 개발자 채용", raw_text="자격요건\n파이썬 3년 이상")
 
     response = client.post(f"/jobs/{job.id}/edit", data={"title": "", "position": "", "raw_text": ""})
     assert response.status_code == 422
@@ -83,11 +80,8 @@ def test_update_job_404_when_missing(client):
     assert response.status_code == 404
 
 
-def test_update_job_success_persists_changes(client, db_session):
-    job = JobPosting(title="원래 제목", position="백엔드 개발자", raw_text="자격요건\n파이썬 3년 이상")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_success_persists_changes(client, db_session, job_factory):
+    job = job_factory(title="원래 제목", raw_text="자격요건\n파이썬 3년 이상")
 
     response = client.post(
         f"/jobs/{job.id}/edit",
@@ -105,11 +99,8 @@ def test_update_job_success_persists_changes(client, db_session):
     assert "Python" in job.required_skills
 
 
-def test_delete_job_success_redirects_with_flash(client, db_session):
-    job = JobPosting(title="삭제될 공고", position="백엔드 개발자", raw_text="자격요건\n파이썬 3년 이상")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_delete_job_success_redirects_with_flash(client, db_session, job_factory):
+    job = job_factory(title="삭제될 공고", raw_text="자격요건\n파이썬 3년 이상")
 
     response = client.post(f"/jobs/{job.id}/delete", follow_redirects=False)
     assert response.status_code == 303
@@ -133,11 +124,8 @@ def test_create_job_defaults_status_to_interest(client, db_session):
     assert job.status == "관심"
 
 
-def test_update_job_changes_status(client, db_session):
-    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="자격요건\nPython", status="관심")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_changes_status(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="자격요건\nPython", status="관심")
 
     client.post(
         f"/jobs/{job.id}/edit",
@@ -153,23 +141,48 @@ def test_update_job_changes_status(client, db_session):
     assert job.status == "면접"
 
 
-def test_list_jobs_filters_by_status(client, db_session):
-    db_session.add_all([
-        JobPosting(title="관심 공고", position="백엔드 개발자", raw_text="x", status="관심"),
-        JobPosting(title="면접 공고", position="백엔드 개발자", raw_text="x", status="면접"),
-    ])
-    db_session.commit()
+def test_create_job_rejects_unknown_status(client, db_session):
+    response = client.post(
+        "/jobs",
+        data={
+            "title": "공고",
+            "position": "백엔드 개발자",
+            "raw_text": "[자격요건]\nPython",
+            "status": "이상한값",
+        },
+    )
+    assert response.status_code == 422
+    assert db_session.query(JobPosting).count() == 0
+
+
+def test_update_job_rejects_unknown_status(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="자격요건\nPython", status="관심")
+
+    response = client.post(
+        f"/jobs/{job.id}/edit",
+        data={
+            "title": "공고",
+            "position": "백엔드 개발자",
+            "raw_text": "[자격요건]\nPython",
+            "status": "이상한값",
+        },
+    )
+    assert response.status_code == 422
+    db_session.refresh(job)
+    assert job.status == "관심"
+
+
+def test_list_jobs_filters_by_status(client, job_factory):
+    job_factory(title="관심 공고", raw_text="x", status="관심")
+    job_factory(title="면접 공고", raw_text="x", status="면접")
 
     response = client.get("/jobs", params={"status": "면접"})
     assert "면접 공고" in response.text
     assert "관심 공고" not in response.text
 
 
-def test_quick_status_update_redirects_with_flash(client, db_session):
-    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_quick_status_update_redirects_with_flash(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", status="관심")
 
     response = client.post(f"/jobs/{job.id}/status", data={"status": "서류합격"}, follow_redirects=False)
     assert response.status_code == 303
@@ -184,11 +197,8 @@ def test_quick_status_update_missing_job_redirects(client):
     assert response.headers["location"] == "/jobs?msg=job_not_found"
 
 
-def test_quick_status_update_rejects_unknown_status(client, db_session):
-    job = JobPosting(title="공고", position="백엔드 개발자", raw_text="x", status="관심")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_quick_status_update_rejects_unknown_status(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", status="관심")
 
     response = client.post(
         f"/jobs/{job.id}/status", data={"status": "이상한값"}, follow_redirects=False
@@ -199,11 +209,8 @@ def test_quick_status_update_rejects_unknown_status(client, db_session):
     assert job.status == "관심"
 
 
-def test_update_job_validation_error_keeps_submitted_values(client, db_session):
-    job = JobPosting(title="원래 제목", position="백엔드 개발자", raw_text="자격요건\nPython")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_validation_error_keeps_submitted_values(client, db_session, job_factory):
+    job = job_factory(title="원래 제목", raw_text="자격요건\nPython")
 
     response = client.post(
         f"/jobs/{job.id}/edit",

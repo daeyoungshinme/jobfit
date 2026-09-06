@@ -44,18 +44,12 @@ def test_tailor_post_reextracts_skills_and_shrinks_gap(client, db_session, job_f
     assert "Kafka" in resume.extracted_skills
 
     followup = client.get("/analysis/tailor", params={"resume_id": resume.id, "job_id": job.id})
-    assert "+ Kafka" not in followup.text  # no longer rendered as a missing-skill chip
+    assert "+ Kafka" not in followup.text  # no longer offered as a missing-skill chip
 
 
-def test_tailor_post_file_resume_updates_raw_text_only(client, db_session, job_factory, resume_factory):
+def test_tailor_post_file_resume_updates_raw_text_only(client, db_session, job_factory, file_resume_factory):
     job = job_factory()
-    resume = resume_factory(
-        label="파일 이력서",
-        source_type="file",
-        raw_text="원본 텍스트 Python",
-        structured={"original_filename": "resume.pdf"},
-        extracted_skills=["Python"],
-    )
+    resume = file_resume_factory()
 
     client.post(
         "/analysis/tailor",
@@ -69,15 +63,26 @@ def test_tailor_post_file_resume_updates_raw_text_only(client, db_session, job_f
     assert "Kafka" in resume.extracted_skills
 
 
-def test_tailor_post_file_resume_rejects_blank_raw_text(client, db_session, job_factory, resume_factory):
+def test_tailor_post_form_resume_rejects_all_blank_fields(client, db_session, job_factory, resume_factory):
     job = job_factory()
-    resume = resume_factory(
-        label="파일 이력서",
-        source_type="file",
-        raw_text="원본 텍스트 Python",
-        structured={"original_filename": "resume.pdf"},
-        extracted_skills=["Python"],
+    resume = resume_factory()  # form source
+
+    response = client.post(
+        "/analysis/tailor",
+        params={"resume_id": resume.id, "job_id": job.id},
+        data={"career": "", "projects": "", "education": "", "skills_text": "   "},
+        follow_redirects=False,
     )
+    assert response.status_code == 422
+
+    db_session.refresh(resume)
+    assert resume.structured["career"] == "Python 백엔드 3년"
+    assert resume.extracted_skills == ["Python"]
+
+
+def test_tailor_post_file_resume_rejects_blank_raw_text(client, db_session, job_factory, file_resume_factory):
+    job = job_factory()
+    resume = file_resume_factory()
 
     response = client.post(
         "/analysis/tailor",

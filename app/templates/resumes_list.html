@@ -18,7 +18,8 @@
     <h3>{{ r.label }}</h3>
     <p class="meta">{{ "파일 업로드" if r.source_type == "file" else "직접 입력" }} · 스킬 {{ r.extracted_skills|length }}개</p>
     <div class="tags">
-      {% for s in r.extracted_skills[:8] %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
+      {% for s in r.extracted_skills[:8] %}<span class="tag tag-required">{{ s }}</span>
+      {% else %}<span class="empty-state">{{ EMPTY_SKILLS }}</span>{% endfor %}
     </div>
   </a>
   {% endfor %}

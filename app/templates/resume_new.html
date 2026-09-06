@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% block title %}이력서 등록 - JobFit{% endblock %}
 {% block content %}
+{% from "_forms.html" import text_field, error_banner %}
+{% from "_resume_fields.html" import resume_fields %}
 {% set errors = errors or {} %}
 {% set values = values or {} %}
 {% set active_tab = active_tab or "file-tab" %}
 <h1>이력서 등록</h1>
 
-{% if errors %}<div class="form-error-banner" role="alert">입력값을 확인해주세요.</div>{% endif %}
+{{ error_banner(errors) }}
 
 <div class="tabs" role="tablist" aria-label="이력서 등록 방식">
   <button type="button" role="tab" aria-selected="{{ 'true' if active_tab == 'file-tab' else 'false' }}" aria-controls="file-tab" id="file-tab-btn" class="tab-btn {{ 'active' if active_tab == 'file-tab' }}" data-tab="file-tab">파일 업로드 (PDF/DOCX)</button>
@@ -15,10 +17,7 @@
 
 <div id="file-tab" class="tab-panel {{ 'active' if active_tab == 'file-tab' }}" role="tabpanel" aria-labelledby="file-tab-btn">
   <form method="post" action="/resumes/upload" enctype="multipart/form-data" class="card form-card">
-    <label>이력서 이름
-      <input type="text" name="label" required placeholder="예: 2026년 8월 버전" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}" {% if errors.label %}aria-invalid="true"{% endif %}>
-      {% if errors.label %}<span class="field-error-text">{{ errors.label }}</span>{% endif %}
-    </label>
+    {{ text_field("label", "이력서 이름", values.label, errors.label, required=True, placeholder="예: 2026년 8월 버전", id="file-label") }}
     <label>파일 (PDF, DOCX, TXT)
       <input type="file" name="file" accept=".pdf,.docx,.txt" required class="{{ 'field-error' if errors.file }}" {% if errors.file %}aria-invalid="true" aria-describedby="file-error"{% endif %}>
       {% if errors.file %}<span class="field-error-text" id="file-error">{{ errors.file }}</span>{% endif %}
@@ -31,12 +30,8 @@
   <form method="post" action="/resumes/form">
     <div class="card form-card">
       <h3>기본 정보</h3>
-      <label>이력서 이름
-        <input type="text" name="label" required placeholder="예: 백엔드 지원용" value="{{ values.label or '' }}" class="{{ 'field-error' if errors.label }}" {% if errors.label %}aria-invalid="true"{% endif %}>
-        {% if errors.label %}<span class="field-error-text">{{ errors.label }}</span>{% endif %}
-      </label>
+      {{ text_field("label", "이력서 이름", values.label, errors.label, required=True, placeholder="예: 백엔드 지원용", id="form-label") }}
     </div>
-    {% from "_resume_fields.html" import resume_fields %}
     {{ resume_fields(values=values) }}
     <button type="submit" class="btn-primary">저장</button>
   </form>

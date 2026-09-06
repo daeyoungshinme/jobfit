@@ -1,0 +1,38 @@
+{# Shared form-rendering pieces. Keep field markup (error class + aria wiring)
+   in one place so every form associates its error text the same way. #}
+
+{% macro error_banner(errors) %}
+{% if errors %}<div class="form-error-banner" role="alert">입력값을 확인해주세요.</div>{% endif %}
+{% endmacro %}
+
+{% macro delete_form(action, confirm_text) %}
+<form method="post" action="{{ action }}" data-confirm="{{ confirm_text }}">
+  <button type="submit" class="btn-danger">삭제</button>
+</form>
+{% endmacro %}
+
+{% macro text_field(name, label, value, error=None, required=False, placeholder="", id=None) %}
+{% set fid = id or name %}
+<label>{{ label }}
+  <input type="text" name="{{ name }}" id="{{ fid }}"{% if required %} required{% endif %}
+    {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+    value="{{ value or '' }}" class="{{ 'field-error' if error }}"
+    {% if error %}aria-invalid="true" aria-describedby="{{ fid }}-error"{% endif %}>
+  {% if error %}<span class="field-error-text" id="{{ fid }}-error">{{ error }}</span>{% endif %}
+</label>
+{% endmacro %}
+
+{# File-source résumé raw-text editor card. Shared by resume_edit.html and the
+   tailor workspace so both stay in step. `value` is the current textarea value;
+   it falls back to the stored text when empty (initial render). #}
+{% macro raw_text_editor(resume, value, error=None, rows=16) %}
+<div class="card form-card">
+  <h3>이력서 원문</h3>
+  <p class="hint">파일 업로드로 등록된 이력서는 항목별 수정 대신 원문 텍스트를 직접 수정합니다. 저장 시 기술 스킬을 다시 인식합니다.</p>
+  <label>원문
+    <textarea name="raw_text" rows="{{ rows }}" required class="{{ 'field-error' if error }}"
+      {% if error %}aria-invalid="true" aria-describedby="raw_text-error"{% endif %}>{{ value or resume.raw_text }}</textarea>
+    {% if error %}<span class="field-error-text" id="raw_text-error">{{ error }}</span>{% endif %}
+  </label>
+</div>
+{% endmacro %}

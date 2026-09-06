@@ -245,6 +245,21 @@ def _split_sections(text: str) -> tuple[dict[str, str], bool]:
     return sections, True
 
 
+def apply_parsed_sections(job, parsed: ParsedJobPosting) -> None:
+    """Write a ParsedJobPosting's section fields onto a JobPosting-like object.
+
+    Shared by `jobs.py` (create/edit) and `db.py::_backfill_job_postings` so
+    both keep the exact same set of fields in step with the parser output —
+    the backfill previously refreshed the section *text* but left
+    required_skills/preferred_skills stale.
+    """
+    job.main_tasks = parsed.main_tasks_text
+    job.required_text = parsed.required_text
+    job.preferred_text = parsed.preferred_text
+    job.required_skills = parsed.required_skills
+    job.preferred_skills = parsed.preferred_skills
+
+
 def parse_job_posting(raw_text: str) -> ParsedJobPosting:
     sections, sections_detected = _split_sections(raw_text)
     required_text = sections["required"]

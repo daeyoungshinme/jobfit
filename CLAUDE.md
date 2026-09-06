@@ -5,9 +5,14 @@ JobFit — 채용공고/이력서 분석 도구 (FastAPI + SQLite, 서버사이�
 ## 실행 / 테스트
 
 ```bash
-uvicorn app.main:app --reload --port 8100   # 또는 ./dev.sh (Git Bash, 기존 서버 정리 후 재기동)
-pytest                                       # tests/
+python -m venv .venv && source .venv/Scripts/activate && pip install -r requirements-dev.txt   # 최초 1회 (런타임만: requirements.txt)
+uvicorn app.main:app --reload --port 8100   # 또는 ./dev.sh (Git Bash, 포트 점유 프로세스 정리 후 재기동)
+pytest                                       # 전체 (tests/). 설정은 pyproject.toml [tool.pytest.ini_options]
+pytest tests/test_matcher.py -q              # 단일 파일 (또는 -k 키워드)
+pytest --cov=app --cov-report=term-missing   # 커버리지 (기본 addopts엔 미포함)
 ```
+
+`pyproject.toml`이 `filterwarnings = ["error"]`로 경고를 에러 취급합니다 — 새 경고가 나오면 무시하지 말고 원인을 고치거나, 서드파티 통제 불가 항목이면 좁은 `ignore` 규칙을 주석과 함께 추가하세요.
 
 데이터는 프로젝트 루트의 `jobfit.db` (SQLite)에 저장됩니다. 외부 AI API는 사용하지 않으며, 스킬 추출/매칭은 전부 정규식·사전 기반 규칙 매칭입니다. OCR([app/services/ocr.py](app/services/ocr.py))만 예외적으로 로컬에 설치된 Tesseract-OCR 바이너리를 호출하지만, 이 역시 외부 서비스 호출이 아닙니다.
 
@@ -17,8 +22,10 @@ pytest                                       # tests/
 
 요청 흐름: `routers` → `services` → `models`. 템플릿은 [app/templates.py](app/templates.py)의 단일 `Jinja2Templates` 인스턴스를 모든 라우터가 `from app.templates import templates`로 가져다 쓰는 공유 구조이며, 여기에 `bulleted` 커스텀 필터와 `flash_messages` 전역이 등록되어 있습니다.
 
-- [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, startup 시 `init_db()` 호출.
+- [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, `lifespan`에서 `init_db()` 호출, `/static` 마운트, `/` → `/jobs` 리다이렉트.
 - [app/templates.py](app/templates.py) — 공유 `Jinja2Templates` 인스턴스, `bulleted` 필터·`flash_messages` 전역 등록.
+- [app/static/app.js](app/static/app.js) / [style.css](app/static/style.css) — 페이지 전역에서 로드되는 단일 JS/CSS. 서버사이드 렌더링을 점진적 향상(progressive enhancement)만 하는 계층 (아래 컨벤션 참고).
+- [app/templates/base.html](app/templates/base.html) — 공통 레이아웃. `#toast`(flash), `#theme-toggle`, `#main-content` 마크업 계약을 `app.js`와 공유. 탭 UI는 `.tab-btn[data-tab]`/`.tab-panel`(현재 [resume_new.html](app/templates/resume_new.html)).
 - [app/routers/jobs.py](app/routers/jobs.py) — 채용공고 CRUD, 스킬 미리보기, OCR 업로드, 출처 사이트(source_site) 추측, 지원 상태(`status`) 빠른 변경(`POST /jobs/{id}/status`).
 - [app/routers/resumes.py](app/routers/resumes.py) — 이력서 업로드(PDF/DOCX/TXT)/폼 등록/수정/삭제. 저장 로직은 [app/services/resume_editor.py](app/services/resume_editor.py)의 `apply_resume_content()`에 모여 있음(`analysis.py`의 맞춤 편집과 공유).
 - [app/routers/analysis.py](app/routers/analysis.py) — 매칭 대시보드(스킬 수요 랭킹 포함), 이력서-공고 코칭(`/coach`), 공고 맞춤 이력서 편집 워크스페이스(`/tailor`, [tailor.html](app/templates/tailor.html)).
@@ -31,7 +38,7 @@ pytest                                       # tests/
 - [app/services/text_formatter.py](app/services/text_formatter.py) — 원문 텍스트를 글머리 기호/괄호 소제목 기준으로 escape된 HTML로 렌더링 (`bulleted` 필터의 구현체).
 - [app/services/validation.py](app/services/validation.py) — `require_fields()`로 폼 필수값 검증. 라우터들이 공통으로 재사용.
 - [app/models.py](app/models.py) — SQLAlchemy 모델 (`JobPosting`, `Resume`).
-- [app/db.py](app/db.py) — SQLite 엔진/세션, 테이블 컬럼 마이그레이션(`_migrate_table_columns()`, 현재 `JobPosting`에 적용 중).
+- [app/db.py](app/db.py) — SQLite 엔진/세션, 테이블 컬럼 마이그레이션(`_migrate_table_columns()`, `job_postings`·`resumes` 양쪽에 배선). 404는 `main.py`의 `StarletteHTTPException` 핸들러가 브라우저엔 `404.html`, API엔 JSON으로 응답.
 - [app/schemas.py](app/schemas.py) — Pydantic 응답 스키마.
 - [app/constants.py](app/constants.py) — 직무/경력/지역/지원상태(`JOB_STATUSES`) 목록, 매칭 가중치, flash 메시지.
 - [app/data/skills_dictionary.json](app/data/skills_dictionary.json) — 카테고리별 스킬명+동의어 사전 (커스터마이징 가능).
@@ -41,6 +48,7 @@ pytest                                       # tests/
 
 - **DB 마이그레이션**: 전용 마이그레이션 도구가 없습니다. [app/db.py](app/db.py)의 `_migrate_table_columns(table_name, columns)`가 테이블 무관 범용 헬퍼입니다 — `JobPosting`에 컬럼을 추가할 때는 `_JOB_POSTING_NEW_COLUMNS`에 `(컬럼명, DDL타입, 기본값 리터럴)`을 추가하면 `init_db()`가 이를 `_migrate_table_columns("job_postings", _JOB_POSTING_NEW_COLUMNS)`로 호출해 누락된 컬럼만 `ALTER TABLE`로 추가합니다(멱등). 그 뒤 `_backfill_job_postings()`가 **매 startup마다** 실행되지만, 재파싱 대상 쿼리 자체가 멱등(`required_text == ""` 행만 건드림)이라 이미 채워진 행은 재차 건드리지 않고, 컬럼 추가 후 백필이 중간에 실패한 경우도 self-heal 합니다. `Resume` 마이그레이션 배선은 이미 존재하나(`_RESUME_NEW_COLUMNS`, 현재 빈 목록) 컬럼을 추가할 때 여기에 항목을 넣고, 기존 행을 채워야 하면 전용 백필 함수를 추가해 `init_db()`에서 호출하세요.
 - **스크립트 인식 단어 경계**: 한글은 조사가 단어에 바로 붙기 때문에, `skill_extractor.py`의 `term_pattern()`이 한글/영문 스크립트별로 다른 경계 규칙을 쓰며 `job_parser.py`도 이를 공유합니다. 유사한 텍스트 매칭 로직을 추가할 때 이 패턴을 재사용하세요.
-- **템플릿/필터 공유**: 새 라우터를 추가할 때 `Jinja2Templates`를 직접 생성하지 말고 `from app.templates import templates`를 사용하세요 — 그래야 `bulleted` 필터와 `flash_messages`·`JOB_STATUS_DEFAULT` 전역이 자동으로 딸려옵니다. 반복되는 마크업은 `_`로 시작하는 파셜의 `{% macro %}`로 뽑아 재사용합니다 — `_job_form.html`(공고 폼), `_resume_fields.html`(이력서 항목), `_filter_group.html`(체크박스 필터 그룹), `_coaching.html`(`score_card`/`category_gaps`/`suggestion_list`).
-- **라우터 응답**: `templates.TemplateResponse(request, "name.html", {...})` 시그니처를 사용하세요(`request`가 첫 인자). 폼 검증은 `app/services/validation.py::require_fields`, 공고 폼은 `jobs.py::JobForm` 의존성 + `_persist_job()`, 이력서 쓰기는 `app/services/resume_editor.py`(`apply_resume_content`/`new_resume`/`validate_resume_content`)를 재사용합니다.
-- **한국어 UI**: 상수, 템플릿, flash 메시지, 에러 문자열은 한국어로 작성되어 있습니다. 새 문자열도 이 관례를 따르세요 (`ocr.py`의 `RuntimeError` 메시지처럼 사용자에게 그대로 노출되는 예외 메시지도 포함).
+- **템플릿/필터 공유**: 새 라우터를 추가할 때 `Jinja2Templates`를 직접 생성하지 말고 `from app.templates import templates`를 사용하세요 — 그래야 `bulleted` 필터와 `flash_messages`·`JOB_STATUS_DEFAULT`·`EMPTY_*`/`SELECT_*`/`FEATURE_*`/`NO_SKILL_DATA*` 전역이 자동으로 딸려옵니다. 반복되는 마크업은 `_`로 시작하는 파셜의 `{% macro %}`로 뽑아 재사용합니다 — `_job_form.html`(공고 폼), `_resume_fields.html`(이력서 항목), `_filter_group.html`(체크박스 필터 그룹), `_coaching.html`(`score_bar`/`score_card`/`category_gaps`/`suggestion_list`), `_forms.html`(`text_field`/`error_banner`/`delete_form`/`raw_text_editor`), `_pick_target.html`(`pick_target`).
+- **라우터 응답**: `templates.TemplateResponse(request, "name.html", {...})` 시그니처를 사용하세요(`request`가 첫 인자, 컨텍스트에 `"request"`를 다시 넣지 않음). 폼 검증은 `app/services/validation.py::require_fields`, 공고 폼은 `jobs.py::JobForm` 의존성 + `_persist_job()`, 이력서 폼은 `routers/_common.py::ResumeContentForm` + `app/services/resume_editor.py`(`apply_resume_content`/`new_resume`/`validate_resume_content`), 상세 조회는 `routers/_common.py::get_or_404`를 재사용합니다.
+- **한국어 UI**: 상수, 템플릿, flash 메시지, 에러 문자열은 한국어로 작성되어 있습니다. 새 문자열도 이 관례를 따르세요 (`ocr.py`의 `RuntimeError` 메시지처럼 사용자에게 그대로 노출되는 예외 메시지도 포함). `app.js`의 사용자 노출 문자열은 상단 `MSG` 객체에 모읍니다.
+- **프론트엔드는 점진적 향상만**: 모든 기능은 JS 없이 동작해야 합니다(폼 submit 버튼은 마크업에 남겨두고 `data-autosubmit`으로 change 시 자동 제출, 삭제 확인은 `form[data-confirm]`). `app.js`의 각 `initX()`는 자기 DOM 훅이 없으면 조용히 반환하므로 한 파일이 전 페이지를 커버합니다 — 새 기능도 이 패턴으로 추가하세요. POST 요청은 `postForm(url, params)` 헬퍼(JSON 파싱 + `res.ok` 검사 + `data.detail` 에러 메시지)를 쓰고, 클라이언트 오류 배너는 `showError()`로 띄웁니다(서버 flash와 동일한 `.toast` 마크업). 편의성 실패(출처 사이트 추측 등)는 배너 없이 삼킵니다.

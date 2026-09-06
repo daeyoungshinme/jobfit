@@ -7,6 +7,7 @@ from app.constants import (
     EXPERIENCE_LEVELS,
     JOB_NOT_FOUND_DETAIL,
     JOB_STATUS_DEFAULT,
+    JOB_STATUS_INVALID_DETAIL,
     JOB_STATUSES,
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MESSAGE,
@@ -15,8 +16,9 @@ from app.constants import (
 )
 from app.db import get_db
 from app.models import JobPosting, Resume
+from app.routers._common import get_or_404
 from app.services.job_parser import (
-    ParsedJobPosting,
+    apply_parsed_sections,
     guess_posting_fields,
     guess_source_site,
     normalize_newlines,
@@ -73,18 +75,15 @@ class JobForm:
         return {name: getattr(self, name) for name in _JOB_FORM_FIELDS}
 
     def validation_errors(self) -> dict:
-        return require_fields(
+        errors = require_fields(
             {"title": self.title, "position": self.position, "raw_text": self.raw_text},
             _JOB_REQUIRED_FIELD_MESSAGES,
         )
-
-
-def _apply_parsed_sections(job: JobPosting, parsed: ParsedJobPosting) -> None:
-    job.main_tasks = parsed.main_tasks_text
-    job.required_text = parsed.required_text
-    job.preferred_text = parsed.preferred_text
-    job.required_skills = parsed.required_skills
-    job.preferred_skills = parsed.preferred_skills
+        # Empty status is fine (_persist_job falls back to JOB_STATUS_DEFAULT);
+        # a non-empty value that isn't a known status is a crafted/stale POST.
+        if self.status and self.status not in JOB_STATUSES:
+            errors["status"] = JOB_STATUS_INVALID_DETAIL
+        return errors
 
 
 def _persist_job(job: JobPosting, form: JobForm) -> None:
@@ -99,7 +98,7 @@ def _persist_job(job: JobPosting, form: JobForm) -> None:
     job.experience_level = form.experience_level
     job.status = form.status or JOB_STATUS_DEFAULT
     job.raw_text = raw_text
-    _apply_parsed_sections(job, parse_job_posting(raw_text))
+    apply_parsed_sections(job, parse_job_posting(raw_text))
 
 
 def _render_job_form(request: Request, template: str, form: JobForm, errors: dict, job=None):
@@ -107,7 +106,6 @@ def _render_job_form(request: Request, template: str, form: JobForm, errors: dic
         request,
         template,
         {
-            "request": request,
             "job": job,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
@@ -125,7 +123,6 @@ def new_job_form(request: Request):
         request,
         "job_new.html",
         {
-            "request": request,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
             "statuses": JOB_STATUSES,
@@ -216,7 +213,6 @@ def list_jobs(
         request,
         "jobs_list.html",
         {
-            "request": request,
             "jobs": jobs,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
@@ -239,16 +235,13 @@ def list_jobs(
 
 @router.get("/{job_id}")
 def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
+    job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
     sections_detected = parse_job_posting(job.raw_text).sections_detected
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
     return templates.TemplateResponse(
         request,
         "job_detail.html",
         {
-            "request": request,
             "job": job,
             "sections_detected": sections_detected,
             "resumes": resumes,
@@ -259,14 +252,11 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
 
 @router.get("/{job_id}/edit")
 def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
+    job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
     return templates.TemplateResponse(
         request,
         "job_edit.html",
         {
-            "request": request,
             "job": job,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
@@ -277,9 +267,7 @@ def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
 
 @router.post("/{job_id}/edit")
 def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
+    job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
 
     errors = form.validation_errors()
     if errors:

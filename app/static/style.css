@@ -329,6 +329,10 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
 
 .empty-state { color: var(--text-muted); padding: 20px 0; }
 
+.empty-state-page { padding: 48px 0; text-align: center; }
+.empty-state-page .hint { margin: 12px 0 24px; }
+.empty-state-page .btn-primary, .empty-state-page .btn-secondary { margin: 0 4px; }
+
 .data-table {
   width: 100%;
   border-collapse: collapse;

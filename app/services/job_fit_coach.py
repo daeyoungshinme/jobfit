@@ -53,7 +53,7 @@ def _build_suggestions(gaps: list[CategoryGap], owned_by_category: dict[str, lis
 
     total_required = sum(len(gap.required_missing) for gap in gaps)
     total_preferred = sum(len(gap.preferred_missing) for gap in gaps)
-    top_gap = max(gaps, key=lambda g: (len(g.required_missing), g.count))
+    top_gap = gaps[0]  # _group_missing_by_category already sorts by this priority
 
     suggestions = [
         CoachingSuggestion(
@@ -95,9 +95,7 @@ def build_coaching(resume_skills: list[str], job: JobPosting, *, resume_text: st
     gaps = _group_missing_by_category(match.missing_required, match.missing_preferred)
     owned_by_category = _owned_skills_by_category(resume_skills, {gap.category for gap in gaps})
     suggestions = _build_suggestions(gaps, owned_by_category)
-    general_review = [
-        CoachingSuggestion(**item) for item in review_resume(resume_text, len(resume_skills))
-    ]
+    general_review = review_resume(resume_text, len(resume_skills))
     return CoachingResult(
         match=match,
         category_gaps=gaps,

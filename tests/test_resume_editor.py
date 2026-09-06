@@ -39,11 +39,17 @@ def test_apply_resume_content_file_source_only_touches_raw_text():
     assert "Python" not in resume.extracted_skills
 
 
-def test_validate_resume_content_requires_raw_text_only_for_file_source():
+def test_validate_resume_content_requires_raw_text_for_file_source():
     assert validate_resume_content("file", raw_text="") == {"raw_text": "이력서 원문을 입력해주세요."}
     assert validate_resume_content("file", raw_text="  ") != {}
     assert validate_resume_content("file", raw_text="내용 있음") == {}
-    assert validate_resume_content("form", raw_text="") == {}
+
+
+def test_validate_resume_content_requires_one_field_for_form_source():
+    assert validate_resume_content("form") != {}
+    assert validate_resume_content("form", career="", projects="   ", education="", skills_text="") != {}
+    assert validate_resume_content("form", skills_text="Python") == {}
+    assert validate_resume_content("form", career="3년차 백엔드") == {}
 
 
 def test_new_resume_form_source_builds_structured_and_skills():

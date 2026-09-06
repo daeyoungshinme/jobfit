@@ -68,11 +68,17 @@ def _migrate_table_columns(table_name: str, columns: list[tuple[str, str, str]])
 
 
 def _backfill_job_postings() -> None:
-    """Re-derive the new section/address fields for postings saved before this migration."""
+    """Re-derive the section fields, address, and source_site for postings saved
+    before those columns existed (or left half-filled by an interrupted run)."""
     from sqlalchemy import select
 
     from app.models import JobPosting
-    from app.services.job_parser import guess_posting_fields, guess_source_site, parse_job_posting
+    from app.services.job_parser import (
+        apply_parsed_sections,
+        guess_posting_fields,
+        guess_source_site,
+        parse_job_posting,
+    )
 
     db = SessionLocal()
     try:
@@ -80,10 +86,7 @@ def _backfill_job_postings() -> None:
             select(JobPosting).where(JobPosting.required_text == "", JobPosting.raw_text != "")
         )
         for job in jobs:
-            parsed = parse_job_posting(job.raw_text)
-            job.main_tasks = parsed.main_tasks_text
-            job.required_text = parsed.required_text
-            job.preferred_text = parsed.preferred_text
+            apply_parsed_sections(job, parse_job_posting(job.raw_text))
             if not job.address:
                 job.address = guess_posting_fields(job.raw_text).address
 

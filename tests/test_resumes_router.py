@@ -22,9 +22,25 @@ def test_upload_resume_with_file_succeeds(client):
     assert response.headers["location"].startswith("/resumes/")
 
 
+def test_upload_resume_with_no_extractable_text_returns_422(client, db_session):
+    response = client.post(
+        "/resumes/upload",
+        data={"label": "빈 파일"},
+        files={"file": ("scan.txt", b"   \n  \t ", "text/plain")},
+    )
+    assert response.status_code == 422
+    assert db_session.query(Resume).count() == 0
+
+
 def test_submit_resume_form_missing_label_returns_422(client):
     response = client.post("/resumes/form", data={"label": "", "career": "3년차 백엔드 개발자"})
     assert response.status_code == 422
+
+
+def test_submit_resume_form_all_blank_content_returns_422(client, db_session):
+    response = client.post("/resumes/form", data={"label": "빈 이력서"})
+    assert response.status_code == 422
+    assert db_session.query(Resume).count() == 0
 
 
 def test_submit_resume_form_success_redirects_to_detail(client, db_session):
@@ -129,6 +145,19 @@ def test_update_resume_file_source_edits_raw_text(client, db_session, resume_fac
     assert resume.raw_text == "Python, Docker 백엔드 개발"
     assert "Docker" in resume.extracted_skills
     assert resume.structured == {"original_filename": "resume.pdf"}
+
+
+def test_update_resume_form_source_all_blank_content_returns_422(client, db_session, resume_factory):
+    resume = resume_factory(label="원래 이름")  # form source
+
+    response = client.post(
+        f"/resumes/{resume.id}/edit",
+        data={"label": "원래 이름", "career": "", "projects": "", "education": "", "skills_text": ""},
+    )
+    assert response.status_code == 422
+
+    db_session.refresh(resume)
+    assert resume.structured["career"] == "Python 백엔드 3년"
 
 
 def test_update_resume_file_source_missing_raw_text_returns_422(client, resume_factory):

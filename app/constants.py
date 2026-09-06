@@ -36,6 +36,7 @@ JOB_STATUS_DEFAULT = "관심"
 # FLASH_MESSAGES entries below; keep the wording of the two in sync.
 JOB_NOT_FOUND_DETAIL = "존재하지 않는 채용공고입니다."
 RESUME_NOT_FOUND_DETAIL = "존재하지 않는 이력서입니다."
+JOB_STATUS_INVALID_DETAIL = "알 수 없는 지원 상태입니다."
 
 # 빈 상태(empty state) 문구 — templates.py에서 Jinja 전역으로 등록해 템플릿이 공유.
 # app/static/app.js의 MSG.noRequiredSkills / noPreferredSkills도 같은 문자열로 유지할 것.
@@ -57,7 +58,7 @@ FLASH_MESSAGES = {
     "job_updated": ("채용공고가 수정되었습니다.", "success"),
     "job_deleted": ("채용공고가 삭제되었습니다.", "success"),
     "job_status_updated": ("지원 상태가 변경되었습니다.", "success"),
-    "job_status_invalid": ("알 수 없는 지원 상태입니다.", "error"),
+    "job_status_invalid": (JOB_STATUS_INVALID_DETAIL, "error"),
     "resume_uploaded": ("이력서가 업로드되었습니다.", "success"),
     "resume_created": ("이력서가 등록되었습니다.", "success"),
     "resume_deleted": ("이력서가 삭제되었습니다.", "success"),
@@ -73,6 +74,7 @@ MATCH_PREFERRED_WEIGHT = 0.3
 # sanity bound against an accidental huge file, not a hardened limit.
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_UPLOAD_MESSAGE = "파일이 너무 큽니다 (최대 10MB)."
+UPLOAD_NO_TEXT_MESSAGE = "파일에서 텍스트를 추출하지 못했습니다. 이미지로만 된 파일이면 OCR 기능을 이용해주세요."
 
 RESUME_MIN_LENGTH = 300
 RESUME_MIN_ACTION_VERB_HITS = 3

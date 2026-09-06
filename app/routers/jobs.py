@@ -7,6 +7,7 @@ from app.constants import (
     EXPERIENCE_LEVELS,
     JOB_NOT_FOUND_DETAIL,
     JOB_STATUS_DEFAULT,
+    JOB_STATUS_INVALID_DETAIL,
     JOB_STATUSES,
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MESSAGE,
@@ -16,7 +17,7 @@ from app.constants import (
 from app.db import get_db
 from app.models import JobPosting, Resume
 from app.services.job_parser import (
-    ParsedJobPosting,
+    apply_parsed_sections,
     guess_posting_fields,
     guess_source_site,
     normalize_newlines,
@@ -73,18 +74,15 @@ class JobForm:
         return {name: getattr(self, name) for name in _JOB_FORM_FIELDS}
 
     def validation_errors(self) -> dict:
-        return require_fields(
+        errors = require_fields(
             {"title": self.title, "position": self.position, "raw_text": self.raw_text},
             _JOB_REQUIRED_FIELD_MESSAGES,
         )
-
-
-def _apply_parsed_sections(job: JobPosting, parsed: ParsedJobPosting) -> None:
-    job.main_tasks = parsed.main_tasks_text
-    job.required_text = parsed.required_text
-    job.preferred_text = parsed.preferred_text
-    job.required_skills = parsed.required_skills
-    job.preferred_skills = parsed.preferred_skills
+        # Empty status is fine (_persist_job falls back to JOB_STATUS_DEFAULT);
+        # a non-empty value that isn't a known status is a crafted/stale POST.
+        if self.status and self.status not in JOB_STATUSES:
+            errors["status"] = JOB_STATUS_INVALID_DETAIL
+        return errors
 
 
 def _persist_job(job: JobPosting, form: JobForm) -> None:
@@ -99,7 +97,7 @@ def _persist_job(job: JobPosting, form: JobForm) -> None:
     job.experience_level = form.experience_level
     job.status = form.status or JOB_STATUS_DEFAULT
     job.raw_text = raw_text
-    _apply_parsed_sections(job, parse_job_posting(raw_text))
+    apply_parsed_sections(job, parse_job_posting(raw_text))
 
 
 def _render_job_form(request: Request, template: str, form: JobForm, errors: dict, job=None):

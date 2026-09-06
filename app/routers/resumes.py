@@ -3,7 +3,12 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.constants import MAX_UPLOAD_BYTES, MAX_UPLOAD_MESSAGE, RESUME_NOT_FOUND_DETAIL
+from app.constants import (
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_MESSAGE,
+    RESUME_NOT_FOUND_DETAIL,
+    UPLOAD_NO_TEXT_MESSAGE,
+)
 from app.db import get_db
 from app.models import JobPosting, Resume
 from app.services.resume_editor import apply_resume_content, new_resume, validate_resume_content
@@ -34,11 +39,14 @@ async def upload_resume(
     raw_text = ""
     if len(content) > MAX_UPLOAD_BYTES:
         errors["file"] = MAX_UPLOAD_MESSAGE
-    else:
+    elif not errors:
         try:
             raw_text = extract_text_from_upload(file.filename, content)
         except ValueError as exc:
             errors["file"] = str(exc)
+        else:
+            if not raw_text.strip():
+                errors["file"] = UPLOAD_NO_TEXT_MESSAGE
 
     if errors:
         return templates.TemplateResponse(
@@ -76,6 +84,9 @@ def submit_resume_form(
     db: Session = Depends(get_db),
 ):
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
+    errors.update(validate_resume_content(
+        "form", career=career, projects=projects, education=education, skills_text=skills_text,
+    ))
     if errors:
         return templates.TemplateResponse(
             request,
@@ -154,7 +165,14 @@ def update_resume(
         raise HTTPException(status_code=404, detail=RESUME_NOT_FOUND_DETAIL)
 
     errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
-    errors.update(validate_resume_content(resume.source_type, raw_text=raw_text))
+    errors.update(validate_resume_content(
+        resume.source_type,
+        raw_text=raw_text,
+        career=career,
+        projects=projects,
+        education=education,
+        skills_text=skills_text,
+    ))
     if errors:
         resume.label = label
         return templates.TemplateResponse(

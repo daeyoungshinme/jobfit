@@ -122,7 +122,14 @@ def save_tailored_resume(
     if redirect:
         return redirect
 
-    errors = validate_resume_content(resume.source_type, raw_text=raw_text)
+    errors = validate_resume_content(
+        resume.source_type,
+        raw_text=raw_text,
+        career=career,
+        projects=projects,
+        education=education,
+        skills_text=skills_text,
+    )
     if errors:
         values = {
             "raw_text": raw_text,

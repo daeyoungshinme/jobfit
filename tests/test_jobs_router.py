@@ -134,6 +134,37 @@ def test_update_job_changes_status(client, db_session, job_factory):
     assert job.status == "면접"
 
 
+def test_create_job_rejects_unknown_status(client, db_session):
+    response = client.post(
+        "/jobs",
+        data={
+            "title": "공고",
+            "position": "백엔드 개발자",
+            "raw_text": "[자격요건]\nPython",
+            "status": "이상한값",
+        },
+    )
+    assert response.status_code == 422
+    assert db_session.query(JobPosting).count() == 0
+
+
+def test_update_job_rejects_unknown_status(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="자격요건\nPython", status="관심")
+
+    response = client.post(
+        f"/jobs/{job.id}/edit",
+        data={
+            "title": "공고",
+            "position": "백엔드 개발자",
+            "raw_text": "[자격요건]\nPython",
+            "status": "이상한값",
+        },
+    )
+    assert response.status_code == 422
+    db_session.refresh(job)
+    assert job.status == "관심"
+
+
 def test_list_jobs_filters_by_status(client, job_factory):
     job_factory(title="관심 공고", raw_text="x", status="관심")
     job_factory(title="면접 공고", raw_text="x", status="면접")

@@ -47,6 +47,9 @@
           {% for s in statuses %}
           <option value="{{ s }}" {% if (v.status or JOB_STATUS_DEFAULT) == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
+          {% if v.status and v.status not in statuses %}
+          <option value="{{ v.status }}" selected>{{ v.status }} (기존 값)</option>
+          {% endif %}
         </select>
       </label>
     </div>

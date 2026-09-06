@@ -1,3 +1,5 @@
+{% from "_forms.html" import text_field, error_banner %}
+
 {% macro job_form(mode, action, submit_label, positions, experience_levels, statuses, job=None, values=None, errors=None) %}
 {% set errors = errors or {} %}
 {% set v = values or job or {} %}
@@ -7,24 +9,18 @@
 <p class="hint">내용을 수정한 뒤 저장하세요. 공고 원문을 바꾸면 필수/우대 스킬과 주요업무가 새 원문 기준으로 다시 계산됩니다.</p>
 {% endif %}
 
-{% if errors %}<div class="form-error-banner" role="alert">입력값을 확인해주세요.</div>{% endif %}
+{{ error_banner(errors) }}
 
 <form method="post" action="{{ action }}">
   <div class="card form-card">
     <h3>기본 정보</h3>
-    <label>공고 제목
-      <input type="text" name="title" id="title" required placeholder="예: 백엔드 개발자 (5년 이상)" value="{{ v.title or '' }}" class="{{ 'field-error' if errors.title }}"
-        {% if errors.title %}aria-invalid="true" aria-describedby="title-error"{% endif %}>
-      {% if errors.title %}<span class="field-error-text" id="title-error">{{ errors.title }}</span>{% endif %}
-    </label>
-    <label>회사명
-      <input type="text" name="company" id="company" placeholder="예: JobFit테크" value="{{ v.company or '' }}">
-    </label>
+    {{ text_field("title", "공고 제목", v.title, errors.title, required=True, placeholder="예: 백엔드 개발자 (5년 이상)") }}
+    {{ text_field("company", "회사명", v.company, placeholder="예: JobFit테크") }}
     <div class="row">
       <label>직무
         <select name="position" id="position" required class="{{ 'field-error' if errors.position }}"
           {% if errors.position %}aria-invalid="true" aria-describedby="position-error"{% endif %}>
-          <option value="" {% if not v.position %}selected{% endif %} disabled>선택하세요</option>
+          <option value="" {% if not v.position %}selected{% endif %} disabled>{{ SELECT_PLACEHOLDER }}</option>
           {% for p in positions %}
           <option value="{{ p }}" {% if v.position == p %}selected{% endif %}>{{ p }}</option>
           {% endfor %}
@@ -56,9 +52,7 @@
 
     <details class="filter-group" {% if v.address or v.url or v.source_site %}open{% endif %}>
       <summary>추가 정보 (선택)</summary>
-      <label>회사 주소
-        <input type="text" name="address" id="address" placeholder="예: 서울특별시 강남구 테헤란로 123" value="{{ v.address or '' }}">
-      </label>
+      {{ text_field("address", "회사 주소", v.address, placeholder="예: 서울특별시 강남구 테헤란로 123") }}
       <label>공고 URL
         <input type="url" name="url" id="url" placeholder="https://..." value="{{ v.url or '' }}">
       </label>

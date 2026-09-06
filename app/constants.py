@@ -43,15 +43,20 @@ JOB_STATUS_INVALID_DETAIL = "알 수 없는 지원 상태입니다."
 EMPTY_SKILLS = "인식된 스킬 없음"
 EMPTY_REQUIRED_SKILLS = "인식된 필수 스킬 없음"
 EMPTY_PREFERRED_SKILLS = "인식된 우대 스킬 없음"
-NO_SKILL_DATA = "스킬 정보 없음"
+NO_SKILL_DATA = "스킬 정보 없음"  # 짧은 뱃지용 (표 셀 등)
+NO_SKILL_DATA_REASON = "이 공고에서 인식된 스킬이 없어 점수를 계산할 수 없습니다."  # 한 줄 설명용
+EMPTY_CATEGORY_GAPS = "부족한 스킬이 없습니다."
 
 # select 안내 옵션 문구
+SELECT_PLACEHOLDER = "선택하세요"
 SELECT_RESUME_PLACEHOLDER = "이력서를 선택하세요"
 SELECT_JOB_PLACEHOLDER = "공고를 선택하세요"
 
-# 기능 명칭 (진입 링크 라벨 규칙: "{선택 대상}(으)로 {기능}")
+# 기능 명칭. 제목/설명에는 풀네임(FEATURE_*), 버튼·표 셀 링크에는 짧은 라벨(FEATURE_*_SHORT).
 FEATURE_TAILOR = "맞춤 이력서 편집"
+FEATURE_TAILOR_SHORT = "맞춤 편집"
 FEATURE_COACH = "맞춤 이력서 코칭"
+FEATURE_COACH_SHORT = "코칭"
 
 FLASH_MESSAGES = {
     "job_created": ("채용공고가 등록되었습니다.", "success"),

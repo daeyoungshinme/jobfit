@@ -1,18 +1,24 @@
 {# Shared coach/tailor rendering pieces. #}
 
+{% macro score_bar(score) %}
+<div class="bar-track" role="progressbar" aria-valuenow="{{ score|round|int }}" aria-valuemin="0" aria-valuemax="100" aria-label="매칭 점수 {{ score }}점">
+  <div class="bar-fill" style="width: {{ score }}%;"></div>
+</div>
+{% endmacro %}
+
 {% macro score_card(match) %}
 <div class="card">
   <h3>매칭 점수</h3>
   {% if match.has_skill_data %}
-  <div class="bar-track"><div class="bar-fill" style="width: {{ match.score }}%;"></div></div>
+  {{ score_bar(match.score) }}
   {{ match.score }}점
   {% else %}
-  <span class="hint">이 공고에서 인식된 스킬이 없어 점수를 계산할 수 없습니다.</span>
+  <span class="hint">{{ NO_SKILL_DATA_REASON }}</span>
   {% endif %}
 </div>
 {% endmacro %}
 
-{% macro category_gaps(gaps, empty_message=None) %}
+{% macro category_gaps(gaps, empty_message=EMPTY_CATEGORY_GAPS) %}
 <div class="card">
   <h3>부족한 스킬 (카테고리별)</h3>
   {% if not gaps %}

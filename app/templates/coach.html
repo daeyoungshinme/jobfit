@@ -8,7 +8,7 @@
 
 {{ score_card(coaching.match) }}
 
-{{ category_gaps(coaching.category_gaps, "부족한 스킬이 없습니다.") }}
+{{ category_gaps(coaching.category_gaps) }}
 
 <div class="card">
   <h3>이 공고 맞춤 보완 가이드</h3>
@@ -21,5 +21,5 @@
   {{ suggestion_list(coaching.general_review) }}
 </div>
 
-<p><a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">이 공고에 맞춰 이력서 편집하기</a></p>
+<p><a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">{{ FEATURE_TAILOR }}하기</a></p>
 {% endblock %}

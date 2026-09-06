@@ -3,10 +3,11 @@
 {% block content %}
 {% from "_resume_fields.html" import resume_fields %}
 {% from "_coaching.html" import score_card, category_gaps %}
+{% from "_forms.html" import error_banner, raw_text_editor %}
 <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
 <h1>{{ job.title }} 맞춤 이력서 편집</h1>
 <p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})
-  · <a href="/analysis/coach?resume_id={{ resume.id }}&job_id={{ job.id }}">전체 코칭 보기</a></p>
+  · <a href="/analysis/coach?resume_id={{ resume.id }}&job_id={{ job.id }}">{{ FEATURE_COACH }} 보기</a></p>
 
 {{ score_card(coaching.match) }}
 
@@ -44,18 +45,10 @@
 
   <div class="tailor-right" id="resume-editor">
     {% set errors = errors or {} %}
-    {% if errors %}<div class="form-error-banner" role="alert">입력값을 확인해주세요.</div>{% endif %}
+    {{ error_banner(errors) }}
     <form method="post" action="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}">
       {% if resume.source_type == "file" %}
-      <div class="card form-card">
-        <h3>이력서 원문</h3>
-        <p class="hint">파일 업로드로 등록된 이력서는 원문 텍스트를 직접 수정합니다. 저장 시 기술 스킬을 다시 인식합니다.</p>
-        <label>원문
-          <textarea name="raw_text" rows="18" required class="{{ 'field-error' if errors.raw_text }}"
-            {% if errors.raw_text %}aria-invalid="true" aria-describedby="raw_text-error"{% endif %}>{{ values.raw_text or resume.raw_text }}</textarea>
-          {% if errors.raw_text %}<span class="field-error-text" id="raw_text-error">{{ errors.raw_text }}</span>{% endif %}
-        </label>
-      </div>
+      {{ raw_text_editor(resume, values.raw_text, errors.raw_text, rows=18) }}
       {% else %}
       {{ resume_fields(values=structured) }}
       {% endif %}

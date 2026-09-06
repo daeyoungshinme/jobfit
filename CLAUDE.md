@@ -5,11 +5,14 @@ JobFit — 채용공고/이력서 분석 도구 (FastAPI + SQLite, 서버사이�
 ## 실행 / 테스트
 
 ```bash
-python -m venv .venv && source .venv/Scripts/activate && pip install -r requirements.txt   # 최초 1회
+python -m venv .venv && source .venv/Scripts/activate && pip install -r requirements-dev.txt   # 최초 1회 (런타임만: requirements.txt)
 uvicorn app.main:app --reload --port 8100   # 또는 ./dev.sh (Git Bash, 포트 점유 프로세스 정리 후 재기동)
-pytest                                       # 전체 (tests/)
+pytest                                       # 전체 (tests/). 설정은 pyproject.toml [tool.pytest.ini_options]
 pytest tests/test_matcher.py -q              # 단일 파일 (또는 -k 키워드)
+pytest --cov=app --cov-report=term-missing   # 커버리지 (기본 addopts엔 미포함)
 ```
+
+`pyproject.toml`이 `filterwarnings = ["error"]`로 경고를 에러 취급합니다 — 새 경고가 나오면 무시하지 말고 원인을 고치거나, 서드파티 통제 불가 항목이면 좁은 `ignore` 규칙을 주석과 함께 추가하세요.
 
 데이터는 프로젝트 루트의 `jobfit.db` (SQLite)에 저장됩니다. 외부 AI API는 사용하지 않으며, 스킬 추출/매칭은 전부 정규식·사전 기반 규칙 매칭입니다. OCR([app/services/ocr.py](app/services/ocr.py))만 예외적으로 로컬에 설치된 Tesseract-OCR 바이너리를 호출하지만, 이 역시 외부 서비스 호출이 아닙니다.
 

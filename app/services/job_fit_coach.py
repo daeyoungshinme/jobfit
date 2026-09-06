@@ -53,7 +53,7 @@ def _build_suggestions(gaps: list[CategoryGap], owned_by_category: dict[str, lis
 
     total_required = sum(len(gap.required_missing) for gap in gaps)
     total_preferred = sum(len(gap.preferred_missing) for gap in gaps)
-    top_gap = max(gaps, key=lambda g: (len(g.required_missing), g.count))
+    top_gap = gaps[0]  # _group_missing_by_category already sorts by this priority
 
     suggestions = [
         CoachingSuggestion(

@@ -16,6 +16,7 @@ from app.constants import (
 )
 from app.db import get_db
 from app.models import JobPosting, Resume
+from app.routers._common import get_or_404
 from app.services.job_parser import (
     apply_parsed_sections,
     guess_posting_fields,
@@ -105,7 +106,6 @@ def _render_job_form(request: Request, template: str, form: JobForm, errors: dic
         request,
         template,
         {
-            "request": request,
             "job": job,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
@@ -123,7 +123,6 @@ def new_job_form(request: Request):
         request,
         "job_new.html",
         {
-            "request": request,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
             "statuses": JOB_STATUSES,
@@ -214,7 +213,6 @@ def list_jobs(
         request,
         "jobs_list.html",
         {
-            "request": request,
             "jobs": jobs,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
@@ -237,16 +235,13 @@ def list_jobs(
 
 @router.get("/{job_id}")
 def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
+    job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
     sections_detected = parse_job_posting(job.raw_text).sections_detected
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
     return templates.TemplateResponse(
         request,
         "job_detail.html",
         {
-            "request": request,
             "job": job,
             "sections_detected": sections_detected,
             "resumes": resumes,
@@ -257,14 +252,11 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
 
 @router.get("/{job_id}/edit")
 def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
+    job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
     return templates.TemplateResponse(
         request,
         "job_edit.html",
         {
-            "request": request,
             "job": job,
             "positions": POSITIONS,
             "experience_levels": EXPERIENCE_LEVELS,
@@ -275,9 +267,7 @@ def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
 
 @router.post("/{job_id}/edit")
 def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=JOB_NOT_FOUND_DETAIL)
+    job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
 
     errors = form.validation_errors()
     if errors:

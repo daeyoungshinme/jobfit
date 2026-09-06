@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.constants import POSITIONS
 from app.db import get_db
 from app.models import JobPosting, Resume
+from app.routers._common import ResumeContentForm
 from app.services.job_fit_coach import build_coaching
 from app.services.matcher import rank_matches, skill_ranking
 from app.services.resume_editor import apply_resume_content, validate_resume_content
@@ -38,7 +39,6 @@ def dashboard(
         request,
         "dashboard.html",
         {
-            "request": request,
             "resumes": resumes,
             "positions": POSITIONS,
             "selected_resume": selected_resume,
@@ -61,7 +61,6 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
         request,
         "coach.html",
         {
-            "request": request,
             "resume": resume,
             "job": job,
             "coaching": coaching,
@@ -92,7 +91,6 @@ def _render_tailor(request, resume, job, *, errors=None, values=None, status_cod
         request,
         "tailor.html",
         {
-            "request": request,
             "resume": resume,
             "job": job,
             "coaching": coaching,
@@ -117,43 +115,20 @@ def save_tailored_resume(
     request: Request,
     resume_id: int = 0,
     job_id: int = 0,
-    raw_text: str = Form(""),
-    career: str = Form(""),
-    projects: str = Form(""),
-    education: str = Form(""),
-    skills_text: str = Form(""),
+    form: ResumeContentForm = Depends(),
     db: Session = Depends(get_db),
 ):
     resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
     if redirect:
         return redirect
 
-    errors = validate_resume_content(
-        resume.source_type,
-        raw_text=raw_text,
-        career=career,
-        projects=projects,
-        education=education,
-        skills_text=skills_text,
-    )
+    errors = validate_resume_content(resume.source_type, **form.content_kwargs())
     if errors:
-        values = {
-            "raw_text": raw_text,
-            "career": career,
-            "projects": projects,
-            "education": education,
-            "skills_text": skills_text,
-        }
-        return _render_tailor(request, resume, job, errors=errors, values=values, status_code=422)
+        return _render_tailor(
+            request, resume, job, errors=errors, values=form.content_kwargs(), status_code=422
+        )
 
-    apply_resume_content(
-        resume,
-        raw_text=raw_text,
-        career=career,
-        projects=projects,
-        education=education,
-        skills_text=skills_text,
-    )
+    apply_resume_content(resume, **form.content_kwargs())
     db.commit()
     return RedirectResponse(
         url=f"/analysis/tailor?resume_id={resume_id}&job_id={job_id}&msg=resume_updated",

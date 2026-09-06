@@ -12,7 +12,7 @@
   <div class="card form-card">
     <h3>기본 정보</h3>
     <label>이력서 이름
-      <input type="text" name="label" required value="{{ resume.label }}" class="{{ 'field-error' if errors.label }}"
+      <input type="text" name="label" required value="{{ v.label if v else resume.label }}" class="{{ 'field-error' if errors.label }}"
         {% if errors.label %}aria-invalid="true" aria-describedby="label-error"{% endif %}>
       {% if errors.label %}<span class="field-error-text" id="label-error">{{ errors.label }}</span>{% endif %}
     </label>

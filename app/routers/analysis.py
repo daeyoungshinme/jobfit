@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import JobPosting, Resume
-from app.routers._common import ResumeContentForm
+from app.routers._common import ResumeContentForm, load_resume_and_job
 from app.services.activity_report import build_activity_report
 from app.services.interview_prep import build_interview_prep
 from app.services.job_fit_coach import build_coaching
@@ -84,7 +84,7 @@ def profile(request: Request, resume_id: int = 0, db: Session = Depends(get_db))
 
 @router.get("/coach")
 def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
-    resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
+    resume, job, redirect = load_resume_and_job(db, resume_id, job_id)
     if redirect:
         return redirect
 
@@ -103,39 +103,12 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
     )
 
 
-def _load_resume(db: Session, resume_id: int):
-    """Return (resume, redirect) — redirect set when the résumé id is missing/unknown."""
-    resume = db.get(Resume, resume_id) if resume_id else None
-    if resume is None:
-        return None, RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)
-    return resume, None
-
-
-def _load_resume_and_job(db: Session, resume_id: int, job_id: int):
-    """Shared guard for the coach/tailor GET routes.
-
-    Returns (resume, job, None) or (None, None, redirect). A missing/blank
-    resume_id/job_id here means a bad query string, not a bad path, so this
-    redirects to the relevant list with a flash — unlike the detail routes
-    (`/jobs/{id}`, `/resumes/{id}`) which 404.
-    """
-    resume, redirect = _load_resume(db, resume_id)
-    if redirect:
-        return None, None, redirect
-    job = db.get(JobPosting, job_id) if job_id else None
-    if job is None:
-        return None, None, RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
-    return resume, job, None
-
-
 @router.get("/interview")
 def interview(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
-    resume, redirect = _load_resume(db, resume_id)
+    # job 은 선택 — 이력서 단독 면접 준비 모드를 허용한다.
+    resume, job, redirect = load_resume_and_job(db, resume_id, job_id, job_optional=True)
     if redirect:
         return redirect
-    job = db.get(JobPosting, job_id) if job_id else None
-    if job_id and job is None:
-        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
 
     prep = build_interview_prep(resume, job)
     return templates.TemplateResponse(
@@ -171,7 +144,7 @@ def _render_tailor(request, resume, job, *, errors=None, values=None, status_cod
 
 @router.get("/tailor")
 def tailor(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = Depends(get_db)):
-    resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
+    resume, job, redirect = load_resume_and_job(db, resume_id, job_id)
     if redirect:
         return redirect
     return _render_tailor(request, resume, job)
@@ -185,7 +158,7 @@ def save_tailored_resume(
     form: ResumeContentForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    resume, job, redirect = _load_resume_and_job(db, resume_id, job_id)
+    resume, job, redirect = load_resume_and_job(db, resume_id, job_id)
     if redirect:
         return redirect
 

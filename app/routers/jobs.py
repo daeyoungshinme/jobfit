@@ -15,7 +15,7 @@ from app.constants import (
 from app.db import get_db
 from app.enums import APPLY_CHANNEL, EXPERIENCE_LEVEL, JOB_STATUS, JOB_STATUS_DEFAULT, POSITION
 from app.models import JobPosting, Resume
-from app.routers._common import get_or_404
+from app.routers._common import get_or_404, load_job, normalize_job_status
 from app.services.job_parser import (
     apply_parsed_sections,
     guess_posting_fields,
@@ -271,11 +271,11 @@ def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Ses
 
 @router.post("/{job_id}/status")
 def update_job_status(job_id: int, status: str = Form(...), db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
-    code = JOB_STATUS.normalize(status)
-    if code is None:
+    job, redirect = load_job(db, job_id)
+    if redirect:
+        return redirect
+    code = normalize_job_status(status)
+    if not code:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
     job.status = code
     db.commit()
@@ -297,12 +297,12 @@ def update_job_application(
     빠른 상태 변경 전용인 POST /jobs/{id}/status 는 그대로 두고, 상세 페이지의 "지원 기록"
     폼이 이 엔드포인트를 쓴다.
     """
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
+    job, redirect = load_job(db, job_id)
+    if redirect:
+        return redirect
 
     applied_at = applied_at.strip()
-    status_code = JOB_STATUS.normalize(status) if status else ""
+    status_code = normalize_job_status(status)
     channel_code = APPLY_CHANNEL.normalize(applied_via) if applied_via else ""
     if status and status_code is None:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
@@ -327,9 +327,9 @@ def update_job_application(
 
 @router.post("/{job_id}/delete")
 def delete_job(job_id: int, db: Session = Depends(get_db)):
-    job = db.get(JobPosting, job_id)
-    if job is None:
-        return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
+    job, redirect = load_job(db, job_id)
+    if redirect:
+        return redirect
     db.delete(job)
     db.commit()
     return RedirectResponse(url="/jobs?msg=job_deleted", status_code=303)

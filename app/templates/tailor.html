@@ -4,7 +4,8 @@
 {% from "_resume_fields.html" import resume_fields, career_meta_fields %}
 {% from "_coaching.html" import score_card, category_gaps %}
 {% from "_forms.html" import error_banner, raw_text_editor %}
-<a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
+{% from "_breadcrumb.html" import breadcrumb %}
+{{ breadcrumb([("매칭 대시보드", "/analysis/dashboard?resume_id=" ~ resume.id), (job.title, "/jobs/" ~ job.id), ("맞춤 편집", None)]) }}
 <h1>{{ job.title }} 맞춤 이력서 편집</h1>
 <p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})
   · <a href="/analysis/coach?resume_id={{ resume.id }}&job_id={{ job.id }}">{{ FEATURE_COACH }} 보기</a></p>

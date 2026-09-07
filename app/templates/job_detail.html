@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 {% block title %}{{ job.title }} - JobFit{% endblock %}
 {% block content %}
+{% from "_breadcrumb.html" import breadcrumb %}
 {% from "_pick_target.html" import pick_target %}
 {% from "_forms.html" import delete_form %}
 {% from "_timeline.html" import timeline %}
-<a href="/jobs" class="back-link">&larr; 목록으로</a>
+{{ breadcrumb([("채용공고", "/jobs"), (job.title, None)]) }}
+
 <h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}</h1>
 <p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
   {% if job.address %} · {{ job.address }}{% endif %}
   {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
-  {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener">원본 공고 보기</a>{% endif %}
+  {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener">원본 공고 보기 ↗</a>{% endif %}
 </p>
 {% if job.employment_type or job.remote_policy or job.deadline or job.salary_text %}
 <p class="meta">
@@ -23,105 +25,135 @@
 </p>
 {% endif %}
 
-<form method="post" action="/jobs/{{ job.id }}/application" class="card">
-  <h3>지원 기록</h3>
-  <div class="filter-bar">
-    <label>지원 상태
-      <select name="status">
-        {% for code, label in JOB_STATUS_CHOICES %}<option value="{{ code }}" {% if job.status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>지원 채널
-      <select name="applied_via">
-        <option value="">선택 안 함</option>
-        {% for code, label in APPLY_CHANNEL_CHOICES %}
-        <option value="{{ code }}" {% if job.applied_via == code or (not job.applied_via and suggested_channel == code) %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>지원일
-      <input type="date" name="applied_at" value="{{ job.applied_at }}">
-    </label>
-    <label>사용한 이력서
-      <select name="applied_resume_id">
-        <option value="0">선택 안 함</option>
-        {% for r in resumes %}<option value="{{ r.id }}" {% if job.applied_resume_id == r.id %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
-      </select>
-    </label>
-  </div>
-  <label>메모
-    <textarea name="memo" rows="3" placeholder="지원 경로 상세, 담당 리크루터, 마감일 등">{{ job.memo }}</textarea>
-  </label>
-  {% if job.applied_resume_id and not applied_resume %}
-  <p class="hint">지원에 사용한 이력서(#{{ job.applied_resume_id }})가 삭제되었습니다.</p>
+<nav class="section-nav" aria-label="이 페이지 구역">
+  <a href="#posting">공고 내용</a>
+  <a href="#tracking">내 지원 관리</a>
+  {% if resumes %}<a href="#analyze">이력서로 분석</a>{% endif %}
+</nav>
+
+{# ---- 공고 내용 ------------------------------------------------------------- #}
+<section id="posting" aria-labelledby="posting-h">
+  <h2 id="posting-h">공고 내용</h2>
+
+  {% if not sections_detected %}
+  <p class="hint">공고 형식을 자동으로 나누지 못해 전체 내용을 자격요건에 담았습니다. 필요하면 <a href="/jobs/{{ job.id }}/edit">수정 화면</a>에서 직접 확인하세요.</p>
   {% endif %}
-  <button type="submit" class="btn-secondary">저장</button>
-</form>
 
-<div class="card">
-  <h3>지원 이력</h3>
-  {{ timeline(timeline_entries) }}
-  <form method="post" action="/jobs/{{ job.id }}/interview" class="filter-bar" style="margin-top:12px;">
-    <label>면접 일정 추가
-      <input type="date" name="event_at" required>
+  {% if job.main_tasks %}
+  <div class="card">
+    <h3>주요업무</h3>
+    <div class="section-text">{{ job.main_tasks|bulleted }}</div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h3>필수 스킬</h3>
+    <div class="tags">
+      {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_REQUIRED_SKILLS }}</span>{% endfor %}
+    </div>
+    {% if job.required_text %}<div class="section-text">{{ job.required_text|bulleted }}</div>{% endif %}
+    <h3>우대 스킬</h3>
+    <div class="tags">
+      {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_PREFERRED_SKILLS }}</span>{% endfor %}
+    </div>
+    {% if job.preferred_text %}<div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
+  </div>
+
+  {% if job.process_text %}
+  <div class="card">
+    <h3>채용 전형</h3>
+    <div class="section-text">{{ job.process_text|bulleted }}</div>
+  </div>
+  {% endif %}
+
+  {% if job.benefits_text %}
+  <div class="card">
+    <h3>복지 · 혜택</h3>
+    <div class="section-text">{{ job.benefits_text|bulleted }}</div>
+  </div>
+  {% endif %}
+
+  <details class="card" {% if not sections_detected %}open{% endif %}>
+    <summary><strong>원문{% if not sections_detected %} (자동 인식 실패 — 여기서 확인하세요){% endif %}</strong></summary>
+    <pre class="raw-text">{{ job.raw_text }}</pre>
+  </details>
+</section>
+
+{# ---- 내 지원 관리 --------------------------------------------------------- #}
+<section id="tracking" aria-labelledby="tracking-h">
+  <h2 id="tracking-h">내 지원 관리</h2>
+
+  <form method="post" action="/jobs/{{ job.id }}/application" class="card form-card">
+    <h3>지원 기록</h3>
+    <div class="row">
+      <label>지원 상태
+        <select name="status">
+          {% for code, label in JOB_STATUS_CHOICES %}<option value="{{ code }}" {% if job.status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>지원 채널
+        <select name="applied_via">
+          <option value="">선택 안 함</option>
+          {% for code, label in APPLY_CHANNEL_CHOICES %}
+          <option value="{{ code }}" {% if job.applied_via == code or (not job.applied_via and suggested_channel == code) %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>지원일
+        <input type="date" name="applied_at" value="{{ job.applied_at }}">
+      </label>
+      <label>사용한 이력서
+        <select name="applied_resume_id">
+          <option value="0">선택 안 함</option>
+          {% for r in resumes %}<option value="{{ r.id }}" {% if job.applied_resume_id == r.id %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>메모
+      <textarea name="memo" rows="3" placeholder="지원 경로 상세, 담당 리크루터, 마감일 등">{{ job.memo }}</textarea>
     </label>
-    <label>메모 (차수·형식 등)
-      <input type="text" name="detail" placeholder="예: 1차 기술 면접 (화상)">
-    </label>
-    <button type="submit" class="btn-secondary">면접 일정 추가</button>
+    {% if job.applied_resume_id and not applied_resume %}
+    <p class="hint">지원에 사용한 이력서(#{{ job.applied_resume_id }})가 삭제되었습니다.</p>
+    {% endif %}
+    <button type="submit" class="btn-primary">지원 기록 저장</button>
   </form>
-</div>
 
+  <div class="card">
+    <h3>지원 이력</h3>
+    {{ timeline(timeline_entries) }}
+    <form method="post" action="/jobs/{{ job.id }}/interview" class="row row-spaced">
+      <label>면접 일정 추가
+        <input type="date" name="event_at" required>
+      </label>
+      <label>메모 (차수·형식 등)
+        <input type="text" name="detail" placeholder="예: 1차 기술 면접 (화상)">
+      </label>
+      <button type="submit" class="btn-secondary">추가</button>
+    </form>
+  </div>
+</section>
+
+{# ---- 이력서로 분석 ------------------------------------------------------- #}
 {% if resumes %}
-<div class="card filter-bar">
-  {{ pick_target("/analysis/coach", "job_id", job.id, "resume_id", "이 이력서로 " ~ FEATURE_COACH_SHORT, resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
-  {{ pick_target("/analysis/tailor", "job_id", job.id, "resume_id", "이 이력서로 " ~ FEATURE_TAILOR_SHORT, resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
-</div>
-{% endif %}
-
-{% if not sections_detected %}
-<p class="hint">공고 형식을 자동으로 나누지 못해 전체 내용을 자격요건에 담았습니다. 필요하면 <a href="/jobs/{{ job.id }}/edit">수정 화면</a>에서 직접 확인하세요.</p>
-{% endif %}
-
-{% if job.main_tasks %}
-<div class="card">
-  <h3>주요업무</h3>
-  <div class="section-text">{{ job.main_tasks|bulleted }}</div>
-</div>
-{% endif %}
-
-<div class="card">
-  <h3>필수 스킬</h3>
-  <div class="tags">
-    {% for s in job.required_skills %}<span class="tag tag-required">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_REQUIRED_SKILLS }}</span>{% endfor %}
+<section id="analyze" aria-labelledby="analyze-h">
+  <h2 id="analyze-h">이 공고로 이력서 분석하기</h2>
+  <div class="card action-cluster">
+    <div class="action-cluster-item">
+      {{ pick_target("/analysis/coach", "job_id", job.id, "resume_id", FEATURE_COACH_SHORT ~ " 받을 이력서", resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
+      <span class="hint">{{ FEATURE_COACH }} — 부족한 스킬과 보완 포인트를 카테고리별로.</span>
+    </div>
+    <div class="action-cluster-item">
+      {{ pick_target("/analysis/tailor", "job_id", job.id, "resume_id", FEATURE_TAILOR_SHORT ~ " 할 이력서", resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
+      <span class="hint">{{ FEATURE_TAILOR }} — 이 공고에 맞춰 이력서를 편집하고 매칭을 다시 계산.</span>
+    </div>
   </div>
-  {% if job.required_text %}<div class="section-text">{{ job.required_text|bulleted }}</div>{% endif %}
-  <h3>우대 스킬</h3>
-  <div class="tags">
-    {% for s in job.preferred_skills %}<span class="tag tag-preferred">{{ s }}</span>{% else %}<span class="empty-state">{{ EMPTY_PREFERRED_SKILLS }}</span>{% endfor %}
-  </div>
-  {% if job.preferred_text %}<div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
-</div>
-
-{% if job.process_text %}
-<div class="card">
-  <h3>채용 전형</h3>
-  <div class="section-text">{{ job.process_text|bulleted }}</div>
-</div>
+</section>
 {% endif %}
 
-{% if job.benefits_text %}
-<div class="card">
-  <h3>복지 · 혜택</h3>
-  <div class="section-text">{{ job.benefits_text|bulleted }}</div>
+<div class="detail-actions">
+  <a href="/jobs/{{ job.id }}/edit" class="btn-secondary">공고 수정</a>
+  {{ delete_form("/jobs/" ~ job.id ~ "/delete", "이 채용공고를 삭제할까요?") }}
 </div>
-{% endif %}
-
-<details class="card" {% if not sections_detected %}open{% endif %}>
-  <summary><strong>원문{% if not sections_detected %} (자동 인식 실패 — 여기서 확인하세요){% endif %}</strong></summary>
-  <pre class="raw-text">{{ job.raw_text }}</pre>
-</details>
-
-<a href="/jobs/{{ job.id }}/edit" class="btn-secondary">수정</a>
-{{ delete_form("/jobs/" ~ job.id ~ "/delete", "이 채용공고를 삭제할까요?") }}
 {% endblock %}

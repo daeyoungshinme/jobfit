@@ -199,6 +199,10 @@ body {
   line-height: var(--lh-normal);
   background: var(--bg);
   color: var(--text);
+  /* Safety net: the page never scrolls sideways. Wide content (tables, code)
+     gets its own .table-scroll / overflow-x container. `clip` (not `hidden`)
+     keeps position: sticky working for descendants. */
+  overflow-x: clip;
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
@@ -285,6 +289,43 @@ h3 { font-size: var(--fs-md); margin: 0 0 var(--space-3); }
 .breadcrumb [aria-current="page"] { color: var(--text); }
 
 /* ==========================================================================
+   Section nav (in-page jump links on long detail pages)
+   ========================================================================== */
+
+.section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-5);
+}
+.section-nav a {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.section-nav a:hover { border-color: var(--primary); color: var(--primary); }
+
+/* A section's leading heading shouldn't stack its top margin against the
+   preceding section's content. */
+section > h2:first-child { margin-top: var(--space-6); }
+
+/* Grouped "pick a target and go" actions, each with a one-line explanation. */
+.action-cluster { display: grid; gap: var(--space-4); }
+.action-cluster-item { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.action-cluster-item form { margin: 0; width: 100%; max-width: 32rem; }
+.action-cluster-item form select { max-width: 100%; }
+.action-cluster-item .hint { margin: 0; }
+
+.detail-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-6); }
+.detail-actions form { margin: 0; }
+
+.row-spaced { margin-top: var(--space-3); }
+
+/* ==========================================================================
    Page header
    ========================================================================== */
 
@@ -320,7 +361,14 @@ h3 { font-size: var(--fs-md); margin: 0 0 var(--space-3); }
 /* Let grid/flex children shrink below their content width so a long
    unbreakable string can't push the track past the viewport. */
 .card-grid > * { min-width: 0; }
-.meta { overflow-wrap: anywhere; }
+/* Inside a grid the gap owns the spacing; drop the card's own vertical margin. */
+.card-grid > .card { margin-top: 0; margin-bottom: 0; }
+.meta { overflow-wrap: break-word; }
+
+.stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+
+a.card { color: inherit; text-decoration: none; }
+a.card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
 
 .job-card {
   text-decoration: none;
@@ -396,7 +444,7 @@ h3 { font-size: var(--fs-md); margin: 0 0 var(--space-3); }
 .btn-secondary { background: var(--btn-secondary-bg); color: var(--primary); }
 .btn-secondary:hover { background: var(--btn-secondary-hover); }
 
-.btn-danger { background: var(--danger-bg); color: var(--danger); margin-top: var(--space-5); }
+.btn-danger { background: var(--danger-bg); color: var(--danger); }
 .btn-danger:hover { border-color: var(--danger); }
 
 .btn-primary:disabled, .btn-secondary:disabled, .btn-danger:disabled {
@@ -933,11 +981,13 @@ button.gap-chip:hover { box-shadow: inset 0 0 0 2px var(--primary); }
 
   .nav-link {
     flex: 1;
+    min-width: 0; /* allow the 4 items to share the bar without overflowing it */
     flex-direction: column;
     justify-content: center;
     gap: 2px;
     padding: var(--space-2) 0;
     font-size: var(--fs-xs);
+    white-space: nowrap;
   }
 
   .nav-link .nav-icon {

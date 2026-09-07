@@ -1,0 +1,19 @@
+{# Wayfinding trail shown at the top of detail / workspace pages, replacing the
+   old hand-rolled "← 목록으로" back-links. `items` is a list of (label, href)
+   pairs in order; give the final (current) item href=None so it renders as
+   plain text with aria-current. #}
+{% macro breadcrumb(items) %}
+<nav class="breadcrumb" aria-label="현재 위치">
+  <ol>
+    {% for label, href in items %}
+    <li>
+      {%- if href and not loop.last -%}
+      <a href="{{ href }}">{{ label }}</a>
+      {%- else -%}
+      <span aria-current="page">{{ label }}</span>
+      {%- endif -%}
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+{% endmacro %}

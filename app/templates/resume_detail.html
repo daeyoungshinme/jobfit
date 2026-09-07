@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ resume.label }} - JobFit{% endblock %}
 {% block content %}
+{% from "_breadcrumb.html" import breadcrumb %}
 {% from "_pick_target.html" import pick_target %}
 {% from "_forms.html" import delete_form %}
-<a href="/resumes" class="back-link">&larr; 목록으로</a>
+{% from "_coaching.html" import suggestion_list %}
+{{ breadcrumb([("이력서", "/resumes"), (resume.label, None)]) }}
 <h1>{{ resume.label }}</h1>
 <p class="meta">{{ "파일 업로드" if resume.source_type == "file" else "직접 입력" }}</p>
 
@@ -14,35 +16,60 @@
   </div>
 </div>
 
-{% from "_coaching.html" import suggestion_list %}
 {% set warning_count = suggestions|selectattr("status", "equalto", "warning")|list|length %}
 <details class="card">
   <summary><strong>이력서 일반 체크리스트</strong>
     {% if warning_count %}<span class="tag tag-required">{{ warning_count }}건 확인 필요</span>{% else %}<span class="tag tag-preferred">모두 양호</span>{% endif %}
   </summary>
-  <p class="hint">공고별 맞춤 코칭은 아래 "이 공고로 코칭"에서 확인하세요.</p>
+  <p class="hint">공고별 맞춤 코칭은 아래 "이 이력서로 분석하기"에서 확인하세요.</p>
   {{ suggestion_list(suggestions) }}
 </details>
 
-<div class="card">
-  <h3>원문</h3>
+<details class="card">
+  <summary><strong>원문</strong></summary>
   <pre class="raw-text">{{ resume.raw_text }}</pre>
+</details>
+
+<section aria-labelledby="analyze-h">
+  <h2 id="analyze-h">이 이력서로 분석하기</h2>
+
+  {% if jobs %}
+  <div class="card action-cluster">
+    <div class="action-cluster-item">
+      {{ pick_target("/analysis/coach", "resume_id", resume.id, "job_id", "공고 골라 " ~ FEATURE_COACH_SHORT, jobs, SELECT_JOB_PLACEHOLDER, "title", "company") }}
+      <span class="hint">{{ FEATURE_COACH }} — 공고 대비 부족한 스킬과 보완 포인트.</span>
+    </div>
+    <div class="action-cluster-item">
+      {{ pick_target("/analysis/tailor", "resume_id", resume.id, "job_id", "공고 골라 " ~ FEATURE_TAILOR_SHORT, jobs, SELECT_JOB_PLACEHOLDER, "title", "company") }}
+      <span class="hint">{{ FEATURE_TAILOR }} — 공고에 맞춰 이력서를 편집하고 매칭 재계산.</span>
+    </div>
+    <div class="action-cluster-item">
+      {{ pick_target("/analysis/interview", "resume_id", resume.id, "job_id", "공고 골라 면접 질문", jobs, SELECT_JOB_PLACEHOLDER, "title", "company") }}
+      <span class="hint">공고 맞춤 면접 예상 질문과 학습 주제.</span>
+    </div>
+  </div>
+  {% else %}
+  <p class="empty-state">등록된 채용공고가 없습니다. <a href="/jobs/new">공고를 등록</a>하면 공고별 코칭·맞춤 편집·면접 질문을 받을 수 있습니다.</p>
+  {% endif %}
+
+  <div class="card action-cluster">
+    <div class="action-cluster-item">
+      <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="btn-secondary">매칭 대시보드 열기</a>
+      <span class="hint">등록된 모든 공고와의 매칭 점수를 한눈에.</span>
+    </div>
+    <div class="action-cluster-item">
+      <a href="/analysis/interview?resume_id={{ resume.id }}" class="btn-secondary">면접 예상 질문 (공고 무관)</a>
+      <span class="hint">보유 스킬·프로젝트 기반 일반 면접 질문.</span>
+    </div>
+    <div class="action-cluster-item">
+      <a href="/analysis/profile?resume_id={{ resume.id }}" class="btn-secondary">플랫폼 프로필 문구 생성</a>
+      <span class="hint">링크드인·리멤버·원티드용 요약 문구.</span>
+    </div>
+  </div>
+</section>
+
+<div class="detail-actions">
+  <a href="/resumes/{{ resume.id }}/edit" class="btn-secondary">이력서 수정</a>
+  {{ delete_form("/resumes/" ~ resume.id ~ "/delete", "이 이력서를 삭제할까요?") }}
 </div>
-
-{% if jobs %}
-<div class="card filter-bar">
-  {{ pick_target("/analysis/tailor", "resume_id", resume.id, "job_id", "이 공고로 " ~ FEATURE_TAILOR_SHORT, jobs, SELECT_JOB_PLACEHOLDER, "title", "company") }}
-  {{ pick_target("/analysis/coach", "resume_id", resume.id, "job_id", "이 공고로 " ~ FEATURE_COACH_SHORT, jobs, SELECT_JOB_PLACEHOLDER, "title", "company") }}
-  {{ pick_target("/analysis/interview", "resume_id", resume.id, "job_id", "이 공고로 면접 질문", jobs, SELECT_JOB_PLACEHOLDER, "title", "company") }}
-</div>
-{% endif %}
-
-<p>
-  <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="btn-secondary">이 이력서로 매칭 대시보드 보기</a>
-  <a href="/analysis/interview?resume_id={{ resume.id }}" class="btn-secondary">면접 예상 질문 (일반)</a>
-  <a href="/analysis/profile?resume_id={{ resume.id }}" class="btn-secondary">플랫폼 프로필 문구 생성</a>
-</p>
-
-<a href="/resumes/{{ resume.id }}/edit" class="btn-secondary">수정</a>
-{{ delete_form("/resumes/" ~ resume.id ~ "/delete", "이 이력서를 삭제할까요?") }}
 {% endblock %}

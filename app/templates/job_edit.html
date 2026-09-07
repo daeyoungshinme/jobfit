@@ -2,6 +2,8 @@
 {% block title %}채용공고 수정 - JobFit{% endblock %}
 {% block content %}
 {% from "_job_form.html" import job_form %}
+{% from "_breadcrumb.html" import breadcrumb %}
+{{ breadcrumb([("채용공고", "/jobs"), (job.title, "/jobs/" ~ job.id), ("수정", None)]) }}
 <h1>채용공고 수정</h1>
 {{ job_form(mode="edit", action="/jobs/" ~ job.id ~ "/edit", submit_label="수정 완료", job=job, values=values, errors=errors) }}
 {% endblock %}

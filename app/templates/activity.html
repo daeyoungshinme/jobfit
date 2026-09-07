@@ -5,11 +5,11 @@
 <p class="hint">등록된 채용공고의 <a href="/jobs">지원 기록</a>에서 집계합니다. 플랫폼 프로필 문구는
   <a href="/analysis/profile">여기</a>에서 생성하세요.</p>
 
-<div class="card-grid">
-  <div class="card stat-tile">
+<div class="card-grid stat-grid">
+  <a class="card stat-tile" href="/jobs">
     <p class="stat-number">{{ report.total }}</p>
     <p class="stat-label">총 공고</p>
-  </div>
+  </a>
   <div class="card stat-tile">
     <p class="stat-number">{{ report.applied_count }}</p>
     <p class="stat-label">지원</p>
@@ -21,33 +21,12 @@
 </div>
 
 <div class="card">
-  <h3>상태별 현황</h3>
-  <ul class="rank-list">
-    {% for status, count in report.status_counts %}
-    <li><span class="rank-name"><span class="tag tag-status">{{ enum_label("job_status", status) }}</span></span><span class="rank-meta">{{ count }}건</span></li>
-    {% endfor %}
-  </ul>
-</div>
-
-<div class="card">
-  <h3>채널별 지원</h3>
-  {% if report.channel_counts %}
-  <ul class="rank-list">
-    {% for channel, count in report.channel_counts %}
-    <li><span class="rank-name">{{ enum_label("apply_channel", channel) }}</span><span class="rank-meta">{{ count }}건</span></li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty-state">기록된 지원 채널이 없습니다.</p>
-  {% endif %}
-</div>
-
-<div class="card">
-  <h3>무응답 경과 (14일 이상)</h3>
+  <h3>무응답 경과 <span class="hint-inline">({{ STALE_AFTER_DAYS }}일 이상)</span></h3>
   {% if report.awaiting_response %}
   <div class="table-scroll">
   <table class="data-table">
-    <thead><tr><th>공고</th><th>회사</th><th>경과</th><th>채널</th></tr></thead>
+    <caption class="visually-hidden">무응답 상태로 {{ STALE_AFTER_DAYS }}일 이상 경과한 지원 목록</caption>
+    <thead><tr><th scope="col">공고</th><th scope="col">회사</th><th scope="col">경과</th><th scope="col">채널</th></tr></thead>
     <tbody>
       {% for r in report.awaiting_response %}
       <tr>
@@ -65,64 +44,88 @@
   {% endif %}
 </div>
 
-<div class="card">
-  <h3>최근 지원</h3>
-  {% if report.recent_applications %}
-  <ul class="rank-list">
-    {% for r in report.recent_applications %}
-    <li>
-      <span class="rank-name">{{ r.applied_at }} · <a href="/jobs/{{ r.job_id }}">{{ r.title }}</a></span>
-      <span class="rank-meta">{% if r.status %}<span class="tag tag-status">{{ enum_label("job_status", r.status) }}</span>{% endif %}</span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty-state">지원일이 기록된 공고가 없습니다.</p>
-  {% endif %}
-</div>
+<div class="card-grid">
+  <div class="card">
+    <h3>상태별 현황</h3>
+    <ul class="rank-list">
+      {% for status, count in report.status_counts %}
+      <li><span class="rank-name"><span class="tag tag-status">{{ enum_label("job_status", status) }}</span></span><span class="rank-meta">{{ count }}건</span></li>
+      {% endfor %}
+    </ul>
+  </div>
 
-<div class="card">
-  <h3>인바운드 제안</h3>
-  {% if report.inbound_leads %}
-  <ul class="rank-list">
-    {% for r in report.inbound_leads %}
-    <li>
-      <span class="rank-name"><a href="/jobs/{{ r.job_id }}">{{ r.title }}</a> <span class="meta">{{ r.company }}</span></span>
-      <span class="rank-meta">{{ enum_label("apply_channel", r.applied_via) if r.applied_via else "-" }}</span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty-state">받은 인바운드 제안이 없습니다. 공고 등록 시 '인바운드' 체크로 기록하세요.</p>
-  {% endif %}
-</div>
+  <div class="card">
+    <h3>채널별 지원</h3>
+    {% if report.channel_counts %}
+    <ul class="rank-list">
+      {% for channel, count in report.channel_counts %}
+      <li><span class="rank-name">{{ enum_label("apply_channel", channel) }}</span><span class="rank-meta">{{ count }}건</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">기록된 지원 채널이 없습니다.</p>
+    {% endif %}
+  </div>
 
-<div class="card">
-  <h3>면접 진행 중</h3>
-  {% if report.interviewing %}
-  <ul class="rank-list">
-    {% for r in report.interviewing %}
-    <li><span class="rank-name"><a href="/jobs/{{ r.job_id }}">{{ r.title }}</a> <span class="meta">{{ r.company }}</span></span></li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty-state">면접 단계 공고가 없습니다.</p>
-  {% endif %}
-</div>
+  <div class="card">
+    <h3>최근 지원</h3>
+    {% if report.recent_applications %}
+    <ul class="rank-list">
+      {% for r in report.recent_applications %}
+      <li>
+        <span class="rank-name">{{ r.applied_at }} · <a href="/jobs/{{ r.job_id }}">{{ r.title }}</a></span>
+        <span class="rank-meta">{% if r.status %}<span class="tag tag-status">{{ enum_label("job_status", r.status) }}</span>{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">지원일이 기록된 공고가 없습니다.</p>
+    {% endif %}
+  </div>
 
-<div class="card">
-  <h3>예정된 면접</h3>
-  {% if report.upcoming_interviews %}
-  <ul class="rank-list">
-    {% for r in report.upcoming_interviews %}
-    <li>
-      <span class="rank-name">{{ r.next_interview }} · <a href="/jobs/{{ r.job_id }}">{{ r.title }}</a>
-        <span class="meta">{{ r.company }}</span></span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="empty-state">예정된 면접이 없습니다. 각 공고 상세에서 "면접 일정 추가"로 기록하세요.</p>
-  {% endif %}
+  <div class="card">
+    <h3>인바운드 제안</h3>
+    {% if report.inbound_leads %}
+    <ul class="rank-list">
+      {% for r in report.inbound_leads %}
+      <li>
+        <span class="rank-name"><a href="/jobs/{{ r.job_id }}">{{ r.title }}</a> <span class="meta">{{ r.company }}</span></span>
+        <span class="rank-meta">{{ enum_label("apply_channel", r.applied_via) if r.applied_via else "-" }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">받은 인바운드 제안이 없습니다. 공고 등록 시 '인바운드' 체크로 기록하세요.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>면접 진행 중</h3>
+    {% if report.interviewing %}
+    <ul class="rank-list">
+      {% for r in report.interviewing %}
+      <li><span class="rank-name"><a href="/jobs/{{ r.job_id }}">{{ r.title }}</a> <span class="meta">{{ r.company }}</span></span></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">면접 단계 공고가 없습니다.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>예정된 면접</h3>
+    {% if report.upcoming_interviews %}
+    <ul class="rank-list">
+      {% for r in report.upcoming_interviews %}
+      <li>
+        <span class="rank-name">{{ r.next_interview }} · <a href="/jobs/{{ r.job_id }}">{{ r.title }}</a>
+          <span class="meta">{{ r.company }}</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">예정된 면접이 없습니다. 각 공고 상세에서 "면접 일정 추가"로 기록하세요.</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

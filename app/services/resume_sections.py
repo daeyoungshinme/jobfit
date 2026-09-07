@@ -9,6 +9,8 @@ form 이력서는 `resume.structured` 를 그대로 신뢰하고, file 이력서
 
 import re
 
+from app.services.text_utils import BULLET_PREFIX, strip_bullet, truncate
+
 # 헤딩 라인은 (장식 제거 후) 키워드 + 흔한 접미어만으로 이뤄져야 한다 — fullmatch.
 # 내용 문장이 키워드를 품고 있어도("OO대학교 컴퓨터공학 졸업") 헤딩으로 오인하지 않도록.
 _HEADING_SUFFIX = r"(?:\s*(?:사항|경험|내용|요약|정보|목록))?"
@@ -19,7 +21,6 @@ _HEADING_KEYWORDS = [
     ("skills", re.compile(rf"(?:기술\s*스택|보유\s*기술|스킬|skills?|tech\s*stack){_HEADING_SUFFIX}", re.IGNORECASE)),
 ]
 
-_BULLET_PREFIX = re.compile(r"^\s*(?:[-*•·▪‣◦▶○]|\d+[.)])\s+")
 _LEAD_DECORATION = re.compile(r"^[\s\[\(【<#*■◆▶●○∙・]+")
 _TRAIL_DECORATION = re.compile(r"[\s\]\)】>#*:：]+$")
 
@@ -30,7 +31,7 @@ def _clean_heading(line: str) -> str:
 
 
 def _match_heading(line: str) -> str | None:
-    if not line.strip() or _BULLET_PREFIX.match(line):
+    if not line.strip() or BULLET_PREFIX.match(line):
         return None
     cleaned = _clean_heading(line)
     if not cleaned or len(cleaned) > 20:
@@ -75,8 +76,28 @@ def sections_for_resume(resume) -> dict[str, str]:
     return split_resume_sections(resume.raw_text or "")
 
 
-def _strip_bullet(line: str) -> str:
-    return _BULLET_PREFIX.sub("", line.strip(), count=1)
+# 섹션 키 → 이력서 리뷰(resume_reviewer)에 노출되는 한국어 이름.
+SECTION_DISPLAY_NAMES = {
+    "career": "경력/경험",
+    "projects": "프로젝트",
+    "education": "학력",
+    "skills": "기술/스킬",
+}
+
+
+def detect_sections(resume) -> dict[str, bool]:
+    """이력서에 각 섹션이 존재하는지 — 섹션 존재 판정의 단일 진실 소스.
+
+    form 이력서는 structured 값을, file 이력서는 헤딩 스캔 결과를 신뢰한다.
+    본문에 키워드가 스쳤다고("OO대학교 졸업") 섹션 있음으로 치지 않는다 —
+    이전에 resume_reviewer 가 느슨한 re.search 로 오판하던 부분.
+    """
+    return {key: bool(text.strip()) for key, text in sections_for_resume(resume).items()}
+
+
+def detect_sections_from_text(raw_text: str) -> dict[str, bool]:
+    """Resume 객체 없이 raw_text 만으로 섹션 존재를 판정 (헤딩 스캔)."""
+    return {key: bool(text.strip()) for key, text in split_resume_sections(raw_text).items()}
 
 
 def split_blocks(section_text: str) -> list[str]:
@@ -93,8 +114,8 @@ def split_blocks(section_text: str) -> list[str]:
         lines = [ln for ln in chunk.splitlines() if ln.strip()]
         if not lines:
             continue
-        if len(lines) > 1 and all(_BULLET_PREFIX.match(ln) for ln in lines):
-            blocks.extend(_strip_bullet(ln) for ln in lines)
+        if len(lines) > 1 and all(BULLET_PREFIX.match(ln) for ln in lines):
+            blocks.extend(strip_bullet(ln) for ln in lines)
         else:
             blocks.append(chunk.strip())
     return [block for block in blocks if block.strip()]
@@ -103,7 +124,7 @@ def split_blocks(section_text: str) -> list[str]:
 def first_line_label(block: str, limit: int = 60) -> str:
     """블록의 첫 비어있지 않은 줄을 라벨로 (불릿 제거 + 길이 제한)."""
     for line in block.splitlines():
-        text = _strip_bullet(line).strip(" \t·-–—:：")
+        text = strip_bullet(line).strip(" \t·-–—:：")
         if text:
-            return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+            return truncate(text, limit)
     return ""

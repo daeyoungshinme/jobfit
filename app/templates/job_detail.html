@@ -4,8 +4,8 @@
 {% from "_pick_target.html" import pick_target %}
 {% from "_forms.html" import delete_form %}
 <a href="/jobs" class="back-link">&larr; 목록으로</a>
-<h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ job.status }}</span>{% endif %}</h1>
-<p class="meta">{{ job.company }} · {{ job.position }} {% if job.experience_level %}· {{ job.experience_level }}{% endif %}
+<h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}</h1>
+<p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
   {% if job.address %} · {{ job.address }}{% endif %}
   {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
   {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener">원본 공고 보기</a>{% endif %}
@@ -16,14 +16,14 @@
   <div class="filter-bar">
     <label>지원 상태
       <select name="status">
-        {% for s in statuses %}<option value="{{ s }}" {% if job.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        {% for code, label in JOB_STATUS_CHOICES %}<option value="{{ code }}" {% if job.status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </label>
     <label>지원 채널
       <select name="applied_via">
         <option value="">선택 안 함</option>
-        {% for c in apply_channels %}
-        <option value="{{ c }}" {% if job.applied_via == c or (not job.applied_via and suggested_channel == c) %}selected{% endif %}>{{ c }}</option>
+        {% for code, label in APPLY_CHANNEL_CHOICES %}
+        <option value="{{ code }}" {% if job.applied_via == code or (not job.applied_via and suggested_channel == code) %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </label>

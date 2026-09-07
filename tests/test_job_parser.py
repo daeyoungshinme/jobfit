@@ -1,3 +1,4 @@
+from app.constants import MAX_RAW_TEXT_CHARS
 from app.services.job_parser import (
     guess_posting_fields,
     guess_source_site,
@@ -44,7 +45,7 @@ def test_fallback_when_no_headers_present():
 def test_guess_posting_fields_from_sample():
     guessed = guess_posting_fields(SAMPLE)
     assert guessed.title == "백엔드 개발자 채용"
-    assert guessed.position == "백엔드 개발자"
+    assert guessed.position == "backend"
     assert guessed.experience_level == "3년 이상"
 
 
@@ -52,19 +53,19 @@ def test_guess_company_from_bracket_prefix():
     guessed = guess_posting_fields("[잡핏테크] 프론트엔드 개발자 모집\n\n[자격요건]\n- React 3년 이상")
     assert guessed.title == "프론트엔드 개발자 모집"
     assert guessed.company == "잡핏테크"
-    assert guessed.position == "프론트엔드 개발자"
+    assert guessed.position == "frontend"
 
 
 def test_guess_position_data_engineer_english_title():
     guessed = guess_posting_fields("Data Engineer\n\n[자격요건]\n- Python, Airflow 경험 3년 이상")
-    assert guessed.position == "데이터 엔지니어"
+    assert guessed.position == "data_eng"
 
 
 def test_guess_position_data_engineer_over_backend_mention():
     guessed = guess_posting_fields(
         "Data Engineer 채용\n\n[자격요건]\n- backend 팀과 협업하여 데이터 파이프라인 구축"
     )
-    assert guessed.position == "데이터 엔지니어"
+    assert guessed.position == "data_eng"
 
 
 def test_guess_company_from_corporate_suffix():
@@ -73,8 +74,8 @@ def test_guess_company_from_corporate_suffix():
 
 
 def test_guess_experience_level_entry_and_open():
-    assert guess_posting_fields("신입 개발자를 채용합니다.").experience_level == "신입"
-    assert guess_posting_fields("경력 무관, 누구나 지원 가능합니다.").experience_level == "무관"
+    assert guess_posting_fields("신입 개발자를 채용합니다.").experience_level == "entry"
+    assert guess_posting_fields("경력 무관, 누구나 지원 가능합니다.").experience_level == "any"
 
 
 def test_guess_source_site_known_domain():
@@ -403,6 +404,22 @@ def test_bracket_tip_block_does_not_bleed_into_preferred_section():
     assert "지원서 작성 Tip" not in parsed.preferred_text
     assert "장애의 원인 분석 과정" not in parsed.preferred_text
     assert "네트워크 및 인프라에 대한 기본적인 이해가 있으신 분" in parsed.preferred_text
+
+
+def test_parse_job_posting_caps_pathological_input():
+    # A huge blob of near-address text used to be a backtracking risk for the
+    # regex parser (and could stall startup via the backfill). The entry point
+    # caps raw_text and every quantifier is bounded, so this returns promptly.
+    import time
+
+    blob = ("서울특별시 강남구 " + "가" * 200 + " ") * 2000  # ~800k chars
+    start = time.perf_counter()
+    parsed = parse_job_posting(blob)
+    guessed = guess_posting_fields(blob)
+    assert time.perf_counter() - start < 2.0
+    assert len(blob) > MAX_RAW_TEXT_CHARS
+    assert isinstance(parsed.required_text, str)
+    assert isinstance(guessed.address, str)
 
 
 def test_normalize_newlines_collapses_crlf_and_cr():

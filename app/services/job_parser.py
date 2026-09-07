@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from app.constants import MAX_RAW_TEXT_CHARS
+from app.enums import EXPERIENCE_LEVEL, POSITION, REGION
 from app.services.skill_extractor import extract_skill_names, term_pattern
 
 _MAIN_TASKS_HEADERS = [r"주요\s*업무", r"담당\s*업무", r"업무\s*내용", r"직무\s*내용", r"하는\s*일"]
@@ -85,21 +87,11 @@ _INLINE_HEADER_SEPARATOR_PATTERN = re.compile(r"\s*[:：\-–—]\s*")
 _BRACKET_LINE_PATTERN = re.compile(r"^[\[【].*[\]】]$")
 _BRACKET_NOTE_KEYWORDS_PATTERN = re.compile(r"tip|유의|안내|참고|주의|필독|note", re.IGNORECASE)
 
-# Ordered so more specific labels (e.g. "풀스택") are tried before the generic
-# labels ("백엔드"/"프론트엔드") whose keywords they'd otherwise also contain.
+# 직무 추측 키워드는 app/enums.py 의 POSITION 멤버 meta["terms"] 에서 온다.
+# POSITION 은 더 구체적인 라벨(풀스택)이 일반 라벨(백엔드/프론트엔드)보다 먼저
+# 오도록 정렬돼 있어 그대로 순회하면 된다.
 _POSITION_TERMS: list[tuple[str, tuple[str, ...]]] = [
-    ("풀스택 개발자", ("풀스택",)),
-    ("안드로이드 개발자", ("안드로이드", "android")),
-    ("iOS 개발자", ("ios",)),
-    ("데이터 엔지니어", ("데이터 엔지니어", "데이터엔지니어", "data engineer", "dataengineer")),
-    (
-        "데이터 사이언티스트/AI・ML 엔지니어",
-        ("데이터 사이언티스트", "머신러닝", "인공지능", "ai 엔지니어", "ml 엔지니어"),
-    ),
-    ("DevOps/인프라 엔지니어", ("devops", "데브옵스", "인프라 엔지니어")),
-    ("QA 엔지니어", ("qa", "품질관리", "품질보증")),
-    ("백엔드 개발자", ("백엔드", "서버 개발자", "backend")),
-    ("프론트엔드 개발자", ("프론트엔드", "프론트 개발자", "frontend")),
+    (m.code, m.meta.get("terms", ())) for m in POSITION if m.meta.get("terms")
 ]
 
 _BRACKET_TITLE_PATTERN = re.compile(r"^\[(?P<company>[^\]]{1,50})\]\s*(?P<rest>.+)$")
@@ -110,9 +102,12 @@ _COMPANY_PATTERN = re.compile(
     rf"\(주\)\s?{_COMPANY_NAME_CHARS}|㈜\s?{_COMPANY_NAME_CHARS}|{_COMPANY_NAME_CHARS}\s?주식회사"
 )
 # Job boards like Wanted often lead with a bullet-separated metadata line
-# ("회사명∙지역∙경력조건") instead of a "[회사명] 직무명" bracket line.
+# ("회사명∙지역∙경력조건") instead of a "[회사명] 직무명" bracket line. The
+# negated classes exclude "\n" (defense-in-depth against a multi-line blob
+# reaching here) and separators are [ \t]* rather than \s* so the match can
+# never span a line.
 _METADATA_LINE_PATTERN = re.compile(
-    r"^(?P<company>[^∙·•]{1,50}?)\s*[∙·•]\s*[^∙·•]{1,30}?\s*[∙·•]\s*경력"
+    r"^(?P<company>[^∙·•\n]{1,50}?)[ \t]*[∙·•][ \t]*[^∙·•\n]{1,30}?[ \t]*[∙·•][ \t]*경력"
 )
 
 # Capped at 1-2 digits since real experience ranges ("3~5년") never go past
@@ -123,13 +118,14 @@ _EXPERIENCE_RANGE_PATTERN = re.compile(r"\b(\d{1,2})\s*[~\-]\s*(\d{1,2})\s*년")
 _EXPERIENCE_MIN_PATTERN = re.compile(r"(\d+)\s*년\s*이상")
 
 _ADDRESS_LABEL_PATTERN = re.compile(r"(?:회사\s*)?(?:주소|근무지|위치)\s*[:：]\s*(?P<value>.+)")
-_SIDO_NAMES = (
-    "서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주"
-)
+_SIDO_NAMES = "|".join(re.escape(code) for code in REGION.codes())
+# Every quantifier is bounded and inter-token whitespace is [ \t]* (not \s*)
+# so this can't backtrack catastrophically on a long pathological line or
+# span a newline.
 _ADDRESS_PATTERN = re.compile(
-    rf"(?:{_SIDO_NAMES})(?:특별시|광역시|특별자치시|특별자치도|도)?\s*"
-    r"[가-힣]+(?:시|군|구)\s*(?:[가-힣]+(?:시|군|구)\s*)?"
-    r"[가-힣0-9.\-]+(?:로|길)\s*[0-9\-]+(?:\s*,?\s*[0-9]+층)?(?:\s*\([가-힣0-9]{1,20}\))?"
+    rf"(?:{_SIDO_NAMES})(?:특별시|광역시|특별자치시|특별자치도|도)?[ \t]*"
+    r"[가-힣]{1,12}(?:시|군|구)[ \t]*(?:[가-힣]{1,12}(?:시|군|구)[ \t]*)?"
+    r"[가-힣0-9.\-]{1,40}(?:로|길)[ \t]*[0-9\-]{1,12}(?:[ \t]*,?[ \t]*[0-9]{1,4}층)?(?:[ \t]*\([가-힣0-9]{1,20}\))?"
 )
 
 
@@ -258,9 +254,11 @@ def apply_parsed_sections(job, parsed: ParsedJobPosting) -> None:
     job.preferred_text = parsed.preferred_text
     job.required_skills = parsed.required_skills
     job.preferred_skills = parsed.preferred_skills
+    job.sections_detected = parsed.sections_detected
 
 
 def parse_job_posting(raw_text: str) -> ParsedJobPosting:
+    raw_text = (raw_text or "")[:MAX_RAW_TEXT_CHARS]
     sections, sections_detected = _split_sections(raw_text)
     required_text = sections["required"]
     preferred_text = sections["preferred"]
@@ -310,26 +308,37 @@ def _guess_company(raw_text: str) -> str:
 
 
 def _guess_position(title: str, raw_text: str) -> str:
-    for label, terms in _POSITION_TERMS:
+    """제목·본문에서 직무를 추측해 POSITION 코드를 돌려준다 (없으면 "")."""
+    for code, terms in _POSITION_TERMS:
         if any(term_pattern(term).search(title) for term in terms):
-            return label
-    for label, terms in _POSITION_TERMS:
+            return code
+    for code, terms in _POSITION_TERMS:
         if any(term_pattern(term).search(raw_text) for term in terms):
-            return label
+            return code
     return ""
+
+
+def _experience_code_for_range(lo: int, hi: int) -> str:
+    """(lo, hi) 가 표준 버킷의 경계와 정확히 일치하면 그 코드를, 아니면 "lo~hi년"
+    자유 문자열을 돌려준다 (사용자가 공고에 적힌 정확한 수치를 보도록)."""
+    for member in EXPERIENCE_LEVEL:
+        if member.meta.get("min_years") == lo and member.meta.get("max_years") == hi:
+            return member.code
+    return f"{lo}~{hi}년"
 
 
 def _guess_experience_level(raw_text: str) -> str:
     if re.search(r"신입", raw_text):
-        return "신입"
+        return "entry"
     if re.search(r"경력\s*무관|\b무관\b", raw_text):
-        return "무관"
+        return "any"
     range_match = _EXPERIENCE_RANGE_PATTERN.search(raw_text)
     if range_match:
-        return f"{range_match.group(1)}~{range_match.group(2)}년"
+        return _experience_code_for_range(int(range_match.group(1)), int(range_match.group(2)))
     min_match = _EXPERIENCE_MIN_PATTERN.search(raw_text)
     if min_match:
-        return f"{min_match.group(1)}년 이상"
+        n = int(min_match.group(1))
+        return "y10p" if n >= 10 else f"{n}년 이상"
     return ""
 
 
@@ -384,6 +393,7 @@ def guess_posting_fields(raw_text: str) -> GuessedFields:
     extraction approach. Callers should treat every field as a suggestion the
     user can still edit before saving.
     """
+    raw_text = (raw_text or "")[:MAX_RAW_TEXT_CHARS]
     title, company = _guess_title_and_company(raw_text)
     if not company:
         company = _guess_company(raw_text)

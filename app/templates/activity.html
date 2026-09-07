@@ -24,7 +24,7 @@
   <h3>상태별 현황</h3>
   <ul class="rank-list">
     {% for status, count in report.status_counts %}
-    <li><span class="rank-name"><span class="tag tag-status">{{ status }}</span></span><span class="rank-meta">{{ count }}건</span></li>
+    <li><span class="rank-name"><span class="tag tag-status">{{ enum_label("job_status", status) }}</span></span><span class="rank-meta">{{ count }}건</span></li>
     {% endfor %}
   </ul>
 </div>
@@ -34,7 +34,7 @@
   {% if report.channel_counts %}
   <ul class="rank-list">
     {% for channel, count in report.channel_counts %}
-    <li><span class="rank-name">{{ channel }}</span><span class="rank-meta">{{ count }}건</span></li>
+    <li><span class="rank-name">{{ enum_label("apply_channel", channel) }}</span><span class="rank-meta">{{ count }}건</span></li>
     {% endfor %}
   </ul>
   {% else %}
@@ -54,7 +54,7 @@
         <td data-label="공고"><a href="/jobs/{{ r.job_id }}">{{ r.title }}</a></td>
         <td data-label="회사">{{ r.company }}</td>
         <td data-label="경과">{{ r.days_since_applied }}일 경과</td>
-        <td data-label="채널">{{ r.applied_via or "-" }}</td>
+        <td data-label="채널">{{ enum_label("apply_channel", r.applied_via) if r.applied_via else "-" }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -72,7 +72,7 @@
     {% for r in report.recent_applications %}
     <li>
       <span class="rank-name">{{ r.applied_at }} · <a href="/jobs/{{ r.job_id }}">{{ r.title }}</a></span>
-      <span class="rank-meta">{% if r.status %}<span class="tag tag-status">{{ r.status }}</span>{% endif %}</span>
+      <span class="rank-meta">{% if r.status %}<span class="tag tag-status">{{ enum_label("job_status", r.status) }}</span>{% endif %}</span>
     </li>
     {% endfor %}
   </ul>
@@ -88,7 +88,7 @@
     {% for r in report.inbound_leads %}
     <li>
       <span class="rank-name"><a href="/jobs/{{ r.job_id }}">{{ r.title }}</a> <span class="meta">{{ r.company }}</span></span>
-      <span class="rank-meta">{{ r.applied_via or "-" }}</span>
+      <span class="rank-meta">{{ enum_label("apply_channel", r.applied_via) if r.applied_via else "-" }}</span>
     </li>
     {% endfor %}
   </ul>

@@ -2,7 +2,7 @@ from app.models import JobPosting, Resume
 from app.services.interview_prep import _CATEGORY_ORDER, build_interview_prep
 
 
-def make_job(*, required=None, preferred=None, position="백엔드 개발자", main_tasks="", experience_level="3~5년"):
+def make_job(*, required=None, preferred=None, position="backend", main_tasks="", experience_level="y3_5"):
     job = JobPosting(
         title="테스트 공고",
         company="테스트회사",
@@ -60,13 +60,13 @@ def test_main_tasks_bullets_become_role_fit_questions():
 
 
 def test_position_study_topics_from_guide():
-    job = make_job(required=["Python"], position="백엔드 개발자")
+    job = make_job(required=["Python"], position="backend")
     prep = build_interview_prep(make_resume(skills=["Python"]), job)
     assert any(t.source.startswith("직무 공통") for t in prep.study_topics)
 
 
 def test_position_gita_and_skill_less_job_do_not_crash():
-    job = make_job(required=[], preferred=[], position="기타", main_tasks="")
+    job = make_job(required=[], preferred=[], position="other", main_tasks="")
     prep = build_interview_prep(make_resume(skills=[]), job)
     assert prep.groups  # 최소 한 그룹(인성·행동)은 존재
     assert prep.match is not None and prep.match.has_skill_data is False
@@ -123,6 +123,18 @@ def test_question_count_and_group_order_and_topic_sorting():
 
     ranks = [{"높음": 0, "중간": 1, "기본": 2}[t.priority] for t in prep.study_topics]
     assert ranks == sorted(ranks)
+
+
+def test_behavioral_bucket_from_experience_code_and_range():
+    from app.services.interview_prep import _experience_bucket
+
+    assert _experience_bucket("entry") == "신입"
+    assert _experience_bucket("y5_10") == "경력"
+    assert _experience_bucket("신입") == "신입"       # (구)라벨도 흡수
+    assert _experience_bucket("2~8년") == "경력"      # 자유 입력 범위
+    assert _experience_bucket("0~1년") == "신입"
+    assert _experience_bucket("any") is None
+    assert _experience_bucket("") is None
 
 
 def test_questions_are_deduped_within_group():

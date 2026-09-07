@@ -10,7 +10,7 @@ def test_dashboard_skill_ranking_lists_skills_across_jobs(client, job_factory):
 def test_dashboard_skill_ranking_respects_position_filter(client, job_factory):
     job_factory(required_skills=["Python"], preferred_skills=[])
 
-    response = client.get("/analysis/dashboard", params={"position": "프론트엔드 개발자"})
+    response = client.get("/analysis/dashboard", params={"position": "frontend"})
     assert response.status_code == 200
     # the only job is filtered out, so the skill-ranking section is not rendered
     assert "많이 요구되는 스킬" not in response.text
@@ -42,8 +42,8 @@ def test_dashboard_with_unknown_resume_id_shows_no_matches(client):
 
 
 def test_activity_page_renders(client, job_factory):
-    job_factory(status="지원완료", applied_via="LinkedIn", applied_at="2026-08-01")
-    job_factory(is_inbound=True, status="관심")
+    job_factory(status="applied", applied_via="linkedin", applied_at="2026-08-01")
+    job_factory(is_inbound=True, status="interest")
     response = client.get("/analysis/activity")
     assert response.status_code == 200
     assert "구직 활동 대시보드" in response.text

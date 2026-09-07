@@ -43,10 +43,29 @@ def test_missing_section_reports_warning():
     assert career_suggestion.status == "warning"
 
 
-def test_present_section_reports_ok():
+def test_prose_mentioning_keyword_is_not_a_section():
+    # 헤딩 없이 본문에 "근무/경력"이 스친 것만으로는 섹션 있음으로 치지 않는다.
     suggestions = review_resume("이 회사에서 3년간 근무하며 경력을 쌓았습니다.", extracted_skill_count=0)
     career_suggestion = next(s for s in suggestions if "경력/경험" in s.title)
+    assert career_suggestion.status == "warning"
+
+
+def test_present_section_reports_ok():
+    text = "경력\nA사 백엔드 개발자 2020-2023\n\n학력\nOO대학교 졸업"
+    suggestions = review_resume(text, extracted_skill_count=0)
+    career_suggestion = next(s for s in suggestions if "경력/경험" in s.title)
     assert career_suggestion.status == "ok"
+
+
+def test_review_resume_trusts_explicit_sections_arg():
+    suggestions = review_resume(
+        "본문만 있는 이력서", extracted_skill_count=0,
+        sections={"career": True, "projects": False, "education": True, "skills": False},
+    )
+    by_title = {s.title.split("'")[1]: s.status for s in suggestions if s.title.startswith("'")}
+    assert by_title["경력/경험"] == "ok"
+    assert by_title["프로젝트"] == "warning"
+    assert by_title["학력"] == "ok"
 
 
 def test_insufficient_quant_expressions_gets_warning():

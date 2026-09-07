@@ -45,7 +45,7 @@ def client(db_session):
 @pytest.fixture()
 def make_job():
     """비영속 JobPosting 빌더 — compute_match 등 순수 서비스 함수 테스트용 (DB 불필요)."""
-    def _make(id, title, required, preferred, position="백엔드 개발자"):
+    def _make(id, title, required, preferred, position="backend"):
         job = JobPosting(
             title=title,
             company="테스트",
@@ -67,7 +67,7 @@ def job_factory(db_session):
         fields = {
             "title": "백엔드 개발자 채용",
             "company": "테스트회사",
-            "position": "백엔드 개발자",
+            "position": "backend",
             "raw_text": "[자격요건]\nPython, Kafka 경험",
             "required_text": "Python, Kafka 경험",
             "required_skills": ["Python", "Kafka"],

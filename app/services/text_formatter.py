@@ -2,7 +2,8 @@ import re
 
 from markupsafe import Markup, escape
 
-_BULLET_PATTERN = re.compile(r"^(?:[•\-*·▪‣◦▶○]|\d+[.)])\s+")
+from app.services.text_utils import BULLET_PREFIX
+
 # Matches both bracket styles job_parser._BRACKET_LINE_PATTERN treats as a
 # section-boundary/sub-heading convention ("[...]" and "【...】"), so a line
 # recognized as a heading there renders as <h4> here too instead of <p>.
@@ -39,7 +40,7 @@ def render_bulleted_html(text: str) -> Markup:
         if not line:
             continue
 
-        bullet_match = _BULLET_PATTERN.match(line)
+        bullet_match = BULLET_PREFIX.match(line)
         if bullet_match:
             list_items.append(str(escape(line[bullet_match.end():].strip())))
             continue

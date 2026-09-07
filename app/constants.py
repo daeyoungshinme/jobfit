@@ -1,66 +1,6 @@
-POSITIONS = [
-    "백엔드 개발자",
-    "프론트엔드 개발자",
-    "풀스택 개발자",
-    "안드로이드 개발자",
-    "iOS 개발자",
-    "데이터 엔지니어",
-    "데이터 사이언티스트/AI・ML 엔지니어",
-    "DevOps/인프라 엔지니어",
-    "QA 엔지니어",
-    "기타",
-]
-
-EXPERIENCE_LEVELS = [
-    "신입",
-    "1~3년",
-    "3~5년",
-    "5~10년",
-    "10년 이상",
-    "무관",
-]
-
-JOB_STATUSES = [
-    "관심",
-    "지원예정",
-    "지원완료",
-    "서류합격",
-    "면접",
-    "최종합격",
-    "불합격",
-    "보류",
-]
-JOB_STATUS_DEFAULT = "관심"
-
-# 지원 경로(어디를 통해 지원했는지). job_detail 의 "지원 기록" 폼에서 선택한다.
-APPLY_CHANNELS = [
-    "사람인",
-    "잡코리아",
-    "원티드",
-    "잡플래닛",
-    "LinkedIn",
-    "리멤버",
-    "회사 채용페이지",
-    "헤드헌터",
-    "지인 추천",
-    "기타",
-]
-
-# source_site(소문자) 안에 포함되면 해당 지원 채널을 기본 선택으로 추천한다.
-SOURCE_SITE_TO_CHANNEL = {
-    "사람인": "사람인",
-    "saramin": "사람인",
-    "잡코리아": "잡코리아",
-    "jobkorea": "잡코리아",
-    "원티드": "원티드",
-    "wanted": "원티드",
-    "잡플래닛": "잡플래닛",
-    "jobplanet": "잡플래닛",
-    "linkedin": "LinkedIn",
-    "링크드인": "LinkedIn",
-    "리멤버": "리멤버",
-    "remember": "리멤버",
-}
+# 도메인 enum(직무/경력/지원상태/지원채널/지역)은 app/enums.py 로 이관됐다 —
+# 코드값(DB 저장) ↔ 한국어 라벨(UI) 분리를 위해. 여기 남은 것은 매칭 가중치,
+# 업로드 한도, 리뷰 임계값, UI 문구, flash 메시지다.
 
 # 404 detail strings for GET routes. The redirect flows use the *_not_found
 # FLASH_MESSAGES entries below; keep the wording of the two in sync.
@@ -113,26 +53,12 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_UPLOAD_MESSAGE = "파일이 너무 큽니다 (최대 10MB)."
 UPLOAD_NO_TEXT_MESSAGE = "파일에서 텍스트를 추출하지 못했습니다. 이미지로만 된 파일이면 OCR 기능을 이용해주세요."
 
+# 붙여넣기/OCR 원문의 방어적 상한. 정규식 파서(job_parser)가 병리적 입력에서
+# backtracking 하지 않도록 파싱 진입부에서 이 길이로 잘라낸다. 실제 채용공고
+# 본문은 이보다 훨씬 짧다.
+MAX_RAW_TEXT_CHARS = 50_000
+MAX_RAW_TEXT_MESSAGE = "공고 원문이 너무 깁니다 (최대 5만 자)."
+
 RESUME_MIN_LENGTH = 300
 RESUME_MIN_ACTION_VERB_HITS = 3
 RESUME_MIN_QUANT_HITS = 3
-
-REGIONS = [
-    "서울",
-    "부산",
-    "대구",
-    "인천",
-    "광주",
-    "대전",
-    "울산",
-    "세종",
-    "경기",
-    "강원",
-    "충북",
-    "충남",
-    "전북",
-    "전남",
-    "경북",
-    "경남",
-    "제주",
-]

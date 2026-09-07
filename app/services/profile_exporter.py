@@ -12,14 +12,15 @@ skill_extractor, 성과 문장 추출은 resume_reviewer.extract_achievement_lin
 import re
 from dataclasses import dataclass, field
 
-from app.constants import POSITIONS
+from app.enums import POSITION
 from app.services.resume_reviewer import extract_achievement_lines
 from app.services.skill_extractor import skill_category_map
+from app.services.text_utils import dedupe, truncate
 
 _YEARS_PATTERN = re.compile(r"(\d{1,2})\s*년(?!제)")  # "3년차" O, "3년제 대학" X
 _MAX_YEARS = 40
 
-# role 추측용 보조 키워드 — POSITIONS 정식 명칭에 안 걸릴 때 이력서 본문에서 찾는다.
+# role 추측용 보조 키워드 — POSITION 정식 명칭에 안 걸릴 때 이력서 본문에서 찾는다.
 _ROLE_KEYWORDS = [
     "백엔드", "프론트엔드", "풀스택", "데이터 엔지니어", "데이터 사이언티스트",
     "DevOps", "인프라", "안드로이드", "iOS", "머신러닝", "ML", "QA",
@@ -81,11 +82,11 @@ def _order_by_demand(skills: list[str], demand: list[str] | None) -> list[str]:
 
 def _guess_role(career_text: str, raw_text: str) -> str:
     haystack = f"{career_text}\n{raw_text}"
-    for position in POSITIONS:
-        if position == "기타":
+    for member in POSITION:
+        if member.code == "other":
             continue
-        if position in haystack:
-            return position
+        if member.label in haystack:
+            return member.label
     for keyword in _ROLE_KEYWORDS:
         if keyword in haystack:
             return keyword
@@ -106,11 +107,6 @@ def _first_nonempty_line(text: str) -> str:
     return ""
 
 
-def _clip(text: str, max_len: int) -> str:
-    text = (text or "").strip()
-    return text if len(text) <= max_len else text[: max_len - 1].rstrip() + "…"
-
-
 def _build_facts(resume, skill_demand: list[str] | None) -> _ResumeFacts:
     structured = resume.structured or {}
     is_form = resume.source_type == "form"
@@ -122,9 +118,7 @@ def _build_facts(resume, skill_demand: list[str] | None) -> _ResumeFacts:
     ordered_skills = _order_by_demand(skills, skill_demand)
     raw_text = resume.raw_text or ""
     category_map = skill_category_map()
-    categories = list(
-        dict.fromkeys(c for c in (category_map.get(s) for s in ordered_skills) if c)
-    )
+    categories = dedupe([c for c in (category_map.get(s) for s in ordered_skills) if c])
 
     return _ResumeFacts(
         label=resume.label,
@@ -152,7 +146,7 @@ def _headline(facts: _ResumeFacts, max_len: int) -> str:
         if len(head) <= max_len:
             return head
         parts.pop()
-    return _clip(prefix + (facts.role or "개발자"), max_len)
+    return truncate(prefix + (facts.role or "개발자"), max_len)
 
 
 def _summary_paragraph(facts: _ResumeFacts, *, sentences: int) -> str:
@@ -169,11 +163,11 @@ def _summary_paragraph(facts: _ResumeFacts, *, sentences: int) -> str:
         candidates.append(f"주요 기술은 {', '.join(facts.ordered_skills[:6])}입니다.")
 
     if facts.achievements:
-        candidates.append(f"대표 성과로는 {_clip(facts.achievements[0], 60)} 등이 있습니다.")
+        candidates.append(f"대표 성과로는 {truncate(facts.achievements[0], 60)} 등이 있습니다.")
 
     career_line = _first_nonempty_line(facts.career_text)
     if career_line:
-        line = _clip(career_line, 80)
+        line = truncate(career_line, 80)
         candidates.append(line if line.endswith((".", "다", "요", "…")) else line + ".")
 
     return " ".join(candidates[:sentences])
@@ -200,7 +194,7 @@ def _skill_list(facts: _ResumeFacts, max_count: int) -> str:
 
 def _keywords(facts: _ResumeFacts, n: int) -> str:
     parts = [facts.role, *facts.ordered_skills[:n], *facts.categories[:3]]
-    return ", ".join(dict.fromkeys(p for p in parts if p))
+    return ", ".join(dedupe([p for p in parts if p]))
 
 
 # --- 플랫폼별 조립 ----------------------------------------------------------

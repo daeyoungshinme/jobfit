@@ -2,6 +2,7 @@
 {% block title %}채용공고 목록 - JobFit{% endblock %}
 {% block content %}
 {% from "_filter_group.html" import filter_group %}
+{% from "_pagination.html" import pagination %}
 <div class="page-header">
   <h1>채용공고 목록 {% if active_filter_count %}<span class="tag tag-source">{{ active_filter_count }}개 필터 적용됨</span>{% endif %}</h1>
   <a href="/jobs/new" class="btn-primary">+ 새 공고 등록</a>
@@ -10,10 +11,10 @@
 <details class="filter-details card">
   <summary>필터{% if active_filter_count %} <span class="tag tag-source">{{ active_filter_count }}</span>{% endif %}</summary>
   <form method="get" action="/jobs" class="filter-bar">
-  {{ filter_group("position", "직무", positions, filters.position) }}
-  {{ filter_group("experience_level", "경력", experience_levels, filters.experience_level) }}
-  {{ filter_group("status", "상태", statuses, filters.status) }}
-  {{ filter_group("region", "지역", regions, filters.region) }}
+  {{ filter_group("position", "직무", POSITION_CHOICES, filters.position) }}
+  {{ filter_group("experience_level", "경력", EXPERIENCE_LEVEL_CHOICES, filters.experience_level) }}
+  {{ filter_group("status", "상태", JOB_STATUS_CHOICES, filters.status) }}
+  {{ filter_group("region", "지역", REGION_CHOICES, filters.region) }}
   {{ filter_group("skill", "기술 스킬", all_skills, filters.skill) }}
   <div class="filter-actions">
     <button type="submit" class="btn-secondary">필터 적용</button>
@@ -23,16 +24,19 @@
 </details>
 
 {% if not jobs %}
-<p class="empty-state">등록된 채용공고가 없습니다. <a href="/jobs/new">지금 등록하기</a></p>
-{% elif jobs|length > 50 %}
-<p class="hint">총 {{ jobs|length }}건 중 전체를 표시 중입니다. 필터를 사용해 좁혀보세요.</p>
+<p class="empty-state">
+  {% if total == 0 and not active_filter_count %}등록된 채용공고가 없습니다. <a href="/jobs/new">지금 등록하기</a>
+  {% else %}조건에 맞는 공고가 없습니다.{% endif %}
+</p>
+{% else %}
+<p class="hint">총 {{ total }}건{% if page_count > 1 %} · {{ page }}/{{ page_count }} 페이지{% endif %}</p>
 {% endif %}
 
 <div class="card-grid">
   {% for job in jobs %}
   <a href="/jobs/{{ job.id }}" class="card job-card">
-    <h3>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ job.status }}</span>{% endif %}</h3>
-    <p class="meta">{{ job.company }} · {{ job.position }} {% if job.experience_level %}· {{ job.experience_level }}{% endif %}
+    <h3>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}</h3>
+    <p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
       {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
     </p>
     <div class="tags">
@@ -43,4 +47,6 @@
   </a>
   {% endfor %}
 </div>
+
+{{ pagination(page, page_count, request) }}
 {% endblock %}

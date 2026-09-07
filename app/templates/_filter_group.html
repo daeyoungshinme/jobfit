@@ -1,11 +1,14 @@
 {% macro filter_group(name, label, options, selected) %}
+{# options 는 평문 문자열 리스트이거나 (value, label) 튜플 리스트 #}
 <details class="filter-group" {% if selected %}open{% endif %}>
   <summary>{{ label }}{% if selected %} ({{ selected|length }}){% endif %}</summary>
   <div class="checkbox-list">
     {% for opt in options %}
+    {% set val = opt if opt is string else opt[0] %}
+    {% set text = opt if opt is string else opt[1] %}
     <label class="checkbox-item">
-      <input type="checkbox" name="{{ name }}" value="{{ opt }}" {% if opt in selected %}checked{% endif %}>
-      {{ opt }}
+      <input type="checkbox" name="{{ name }}" value="{{ val }}" {% if val in selected %}checked{% endif %}>
+      {{ text }}
     </label>
     {% endfor %}
   </div>

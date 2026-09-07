@@ -3,8 +3,7 @@ from app.schemas import CategoryGap, CoachingResult, CoachingSuggestion
 from app.services.matcher import compute_match
 from app.services.resume_reviewer import review_resume
 from app.services.skill_extractor import skill_category_map
-
-_UNKNOWN_CATEGORY = "기타"
+from app.services.text_utils import UNKNOWN_CATEGORY
 
 
 def _group_missing_by_category(missing_required: list[str], missing_preferred: list[str]) -> list[CategoryGap]:
@@ -12,14 +11,14 @@ def _group_missing_by_category(missing_required: list[str], missing_preferred: l
     by_category: dict[str, CategoryGap] = {}
 
     for name in missing_required:
-        category = cat_map.get(name, _UNKNOWN_CATEGORY)
+        category = cat_map.get(name, UNKNOWN_CATEGORY)
         gap = by_category.setdefault(
             category, CategoryGap(category=category, required_missing=[], preferred_missing=[], count=0)
         )
         gap.required_missing.append(name)
 
     for name in missing_preferred:
-        category = cat_map.get(name, _UNKNOWN_CATEGORY)
+        category = cat_map.get(name, UNKNOWN_CATEGORY)
         gap = by_category.setdefault(
             category, CategoryGap(category=category, required_missing=[], preferred_missing=[], count=0)
         )
@@ -90,12 +89,18 @@ def _build_suggestions(gaps: list[CategoryGap], owned_by_category: dict[str, lis
     return suggestions
 
 
-def build_coaching(resume_skills: list[str], job: JobPosting, *, resume_text: str = "") -> CoachingResult:
+def build_coaching(
+    resume_skills: list[str],
+    job: JobPosting,
+    *,
+    resume_text: str = "",
+    resume_sections: dict[str, bool] | None = None,
+) -> CoachingResult:
     match = compute_match(resume_skills, job)
     gaps = _group_missing_by_category(match.missing_required, match.missing_preferred)
     owned_by_category = _owned_skills_by_category(resume_skills, {gap.category for gap in gaps})
     suggestions = _build_suggestions(gaps, owned_by_category)
-    general_review = review_resume(resume_text, len(resume_skills))
+    general_review = review_resume(resume_text, len(resume_skills), sections=resume_sections)
     return CoachingResult(
         match=match,
         category_gaps=gaps,

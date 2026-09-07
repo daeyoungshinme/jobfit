@@ -3,8 +3,7 @@ from app.schemas import CategoryGap, CoachingResult, CoachingSuggestion
 from app.services.matcher import compute_match
 from app.services.resume_reviewer import review_resume
 from app.services.skill_extractor import skill_category_map
-
-_UNKNOWN_CATEGORY = "기타"
+from app.services.text_utils import UNKNOWN_CATEGORY
 
 
 def _group_missing_by_category(missing_required: list[str], missing_preferred: list[str]) -> list[CategoryGap]:
@@ -12,14 +11,14 @@ def _group_missing_by_category(missing_required: list[str], missing_preferred: l
     by_category: dict[str, CategoryGap] = {}
 
     for name in missing_required:
-        category = cat_map.get(name, _UNKNOWN_CATEGORY)
+        category = cat_map.get(name, UNKNOWN_CATEGORY)
         gap = by_category.setdefault(
             category, CategoryGap(category=category, required_missing=[], preferred_missing=[], count=0)
         )
         gap.required_missing.append(name)
 
     for name in missing_preferred:
-        category = cat_map.get(name, _UNKNOWN_CATEGORY)
+        category = cat_map.get(name, UNKNOWN_CATEGORY)
         gap = by_category.setdefault(
             category, CategoryGap(category=category, required_missing=[], preferred_missing=[], count=0)
         )

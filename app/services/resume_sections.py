@@ -9,6 +9,8 @@ form 이력서는 `resume.structured` 를 그대로 신뢰하고, file 이력서
 
 import re
 
+from app.services.text_utils import BULLET_PREFIX, strip_bullet, truncate
+
 # 헤딩 라인은 (장식 제거 후) 키워드 + 흔한 접미어만으로 이뤄져야 한다 — fullmatch.
 # 내용 문장이 키워드를 품고 있어도("OO대학교 컴퓨터공학 졸업") 헤딩으로 오인하지 않도록.
 _HEADING_SUFFIX = r"(?:\s*(?:사항|경험|내용|요약|정보|목록))?"
@@ -19,7 +21,6 @@ _HEADING_KEYWORDS = [
     ("skills", re.compile(rf"(?:기술\s*스택|보유\s*기술|스킬|skills?|tech\s*stack){_HEADING_SUFFIX}", re.IGNORECASE)),
 ]
 
-_BULLET_PREFIX = re.compile(r"^\s*(?:[-*•·▪‣◦▶○]|\d+[.)])\s+")
 _LEAD_DECORATION = re.compile(r"^[\s\[\(【<#*■◆▶●○∙・]+")
 _TRAIL_DECORATION = re.compile(r"[\s\]\)】>#*:：]+$")
 
@@ -30,7 +31,7 @@ def _clean_heading(line: str) -> str:
 
 
 def _match_heading(line: str) -> str | None:
-    if not line.strip() or _BULLET_PREFIX.match(line):
+    if not line.strip() or BULLET_PREFIX.match(line):
         return None
     cleaned = _clean_heading(line)
     if not cleaned or len(cleaned) > 20:
@@ -75,10 +76,6 @@ def sections_for_resume(resume) -> dict[str, str]:
     return split_resume_sections(resume.raw_text or "")
 
 
-def _strip_bullet(line: str) -> str:
-    return _BULLET_PREFIX.sub("", line.strip(), count=1)
-
-
 def split_blocks(section_text: str) -> list[str]:
     """섹션 본문을 개별 프로젝트/경력 항목으로 분리한다.
 
@@ -93,8 +90,8 @@ def split_blocks(section_text: str) -> list[str]:
         lines = [ln for ln in chunk.splitlines() if ln.strip()]
         if not lines:
             continue
-        if len(lines) > 1 and all(_BULLET_PREFIX.match(ln) for ln in lines):
-            blocks.extend(_strip_bullet(ln) for ln in lines)
+        if len(lines) > 1 and all(BULLET_PREFIX.match(ln) for ln in lines):
+            blocks.extend(strip_bullet(ln) for ln in lines)
         else:
             blocks.append(chunk.strip())
     return [block for block in blocks if block.strip()]
@@ -103,7 +100,7 @@ def split_blocks(section_text: str) -> list[str]:
 def first_line_label(block: str, limit: int = 60) -> str:
     """블록의 첫 비어있지 않은 줄을 라벨로 (불릿 제거 + 길이 제한)."""
     for line in block.splitlines():
-        text = _strip_bullet(line).strip(" \t·-–—:：")
+        text = strip_bullet(line).strip(" \t·-–—:：")
         if text:
-            return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+            return truncate(text, limit)
     return ""

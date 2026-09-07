@@ -2,6 +2,7 @@ import re
 
 from app.constants import RESUME_MIN_ACTION_VERB_HITS, RESUME_MIN_LENGTH, RESUME_MIN_QUANT_HITS
 from app.schemas import CoachingSuggestion
+from app.services.text_utils import QUANT_PATTERN
 
 _SECTION_PATTERNS = {
     "경력/경험": re.compile(r"경력|경험|근무|재직"),
@@ -10,7 +11,6 @@ _SECTION_PATTERNS = {
     "기술/스킬": re.compile(r"기술\s*스택|스킬|skill", re.IGNORECASE),
 }
 
-_QUANT_PATTERN = re.compile(r"\d+(\.\d+)?\s*(%|퍼센트|배|건|명|시간|일|개월|년|원|억|만)")
 _IMPROVEMENT_WORD_PATTERN = re.compile(r"증가|감소|향상|절감|단축|달성|개선")
 _ACTION_VERBS = ["개발", "설계", "구축", "운영", "리드", "주도", "담당", "최적화", "도입", "분석", "기획", "해결"]
 
@@ -19,7 +19,7 @@ def extract_achievement_lines(raw_text: str, limit: int = 6) -> list[str]:
     """이력서 원문에서 성과로 읽히는 줄(정량 수치 또는 액션 동사)을 점수 높은 순으로 추린다.
 
     app.services.profile_exporter 가 플랫폼 프로필 문구를 만들 때 공유한다. review_resume 와
-    같은 모듈 상수(_QUANT_PATTERN / _IMPROVEMENT_WORD_PATTERN / _ACTION_VERBS)를 재사용한다.
+    같은 판정 상수(text_utils.QUANT_PATTERN / _IMPROVEMENT_WORD_PATTERN / _ACTION_VERBS)를 재사용한다.
     """
     scored: list[tuple[int, int, str]] = []
     for idx, line in enumerate((raw_text or "").splitlines()):
@@ -27,7 +27,7 @@ def extract_achievement_lines(raw_text: str, limit: int = 6) -> list[str]:
         if len(text) < 8 or (text.startswith("[") and text.endswith("]")):
             continue
         score = (
-            len(_QUANT_PATTERN.findall(text)) * 2
+            len(QUANT_PATTERN.findall(text)) * 2
             + len(_IMPROVEMENT_WORD_PATTERN.findall(text))
             + sum(1 for verb in _ACTION_VERBS if verb in text)
         )
@@ -69,7 +69,7 @@ def review_resume(raw_text: str, extracted_skill_count: int) -> list[CoachingSug
                 detail="채용담당자가 빠르게 파악할 수 있도록 해당 섹션을 명시적으로 추가하는 것을 권장합니다.",
             ))
 
-    quant_hits = len(_QUANT_PATTERN.findall(text)) + len(_IMPROVEMENT_WORD_PATTERN.findall(text))
+    quant_hits = len(QUANT_PATTERN.findall(text)) + len(_IMPROVEMENT_WORD_PATTERN.findall(text))
     if quant_hits >= RESUME_MIN_QUANT_HITS:
         suggestions.append(CoachingSuggestion(
             status="ok",

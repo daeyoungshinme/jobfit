@@ -14,6 +14,7 @@ class SkillEntry:
     name: str
     category: str
     terms: tuple[str, ...]  # lowercased name + aliases, used for matching
+    related: tuple[str, ...] = ()  # 대체/인접 스킬 이름 (매칭 부분 점수용)
 
 
 @lru_cache(maxsize=1)
@@ -23,8 +24,23 @@ def load_skill_entries() -> tuple[SkillEntry, ...]:
     for category, skills in raw.items():
         for skill in skills:
             terms = tuple({skill["name"].lower(), *[a.lower() for a in skill.get("aliases", [])]})
-            entries.append(SkillEntry(name=skill["name"], category=category, terms=terms))
+            entries.append(SkillEntry(
+                name=skill["name"], category=category, terms=terms,
+                related=tuple(skill.get("related", [])),
+            ))
     return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def related_skill_map() -> dict[str, frozenset[str]]:
+    """스킬 이름 → 대체/인접 스킬 이름 집합. 사전의 `related` 를 대칭으로 보정한다
+    (A 가 B 를 가리키면 B → A 도 성립하게)."""
+    pairs: dict[str, set[str]] = {}
+    for entry in load_skill_entries():
+        for other in entry.related:
+            pairs.setdefault(entry.name, set()).add(other)
+            pairs.setdefault(other, set()).add(entry.name)
+    return {name: frozenset(v - {name}) for name, v in pairs.items()}
 
 
 # Common Korean case/topic particles (조사) that attach directly to a noun

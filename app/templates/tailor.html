@@ -21,13 +21,13 @@
       <h4>필수</h4>
       <div class="tags">
         {% for s in coaching.match.matched_required %}<span class="tag tag-preferred">✓ {{ s }}</span>{% endfor %}
-        {% for s in coaching.match.missing_required %}<button type="button" class="tag tag-required gap-chip">+ {{ s }}</button>{% endfor %}
+        {% for s in coaching.match.missing_required %}<button type="button" class="tag tag-required gap-chip{% if s in coaching.match.related_required %} tag-related{% endif %}"{% if s in coaching.match.related_required %} title="대체·인접 스킬 보유 — 부분 인정"{% endif %}>{% if s in coaching.match.related_required %}≈{% else %}+{% endif %} {{ s }}</button>{% endfor %}
         {% if not coaching.match.matched_required and not coaching.match.missing_required %}<span class="empty-state">{{ EMPTY_REQUIRED_SKILLS }}</span>{% endif %}
       </div>
       <h4>우대</h4>
       <div class="tags">
         {% for s in coaching.match.matched_preferred %}<span class="tag tag-preferred">✓ {{ s }}</span>{% endfor %}
-        {% for s in coaching.match.missing_preferred %}<button type="button" class="tag tag-preferred gap-chip">+ {{ s }}</button>{% endfor %}
+        {% for s in coaching.match.missing_preferred %}<button type="button" class="tag tag-preferred gap-chip{% if s in coaching.match.related_preferred %} tag-related{% endif %}"{% if s in coaching.match.related_preferred %} title="대체·인접 스킬 보유 — 부분 인정"{% endif %}>{% if s in coaching.match.related_preferred %}≈{% else %}+{% endif %} {{ s }}</button>{% endfor %}
         {% if not coaching.match.matched_preferred and not coaching.match.missing_preferred %}<span class="empty-state">{{ EMPTY_PREFERRED_SKILLS }}</span>{% endif %}
       </div>
     </div>

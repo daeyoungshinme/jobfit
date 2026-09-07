@@ -14,6 +14,9 @@ class MatchResult(BaseModel):
     missing_required: list[str]
     matched_preferred: list[str]
     missing_preferred: list[str]
+    # missing_* 중 대체/인접 스킬로 커버되는 부분집합 (예: React 요구 + Vue 보유)
+    related_required: list[str] = []
+    related_preferred: list[str] = []
 
 
 class SkillRank(BaseModel):

@@ -37,6 +37,17 @@
 </div>
 {% endmacro %}
 
+{% macro missing_tags(missing, related, tag_class) %}
+{# related(대체 스킬 보유) 항목은 ≈ 로 구분해 표시한다 — 점수엔 부분 인정됨. #}
+{% for s in missing %}
+{%- if s in related -%}
+<span class="tag {{ tag_class }} tag-related" title="대체·인접 스킬을 보유하고 있어 부분 인정됩니다">≈ {{ s }}</span>
+{%- else -%}
+<span class="tag {{ tag_class }}">{{ s }}</span>
+{%- endif %}
+{% endfor %}
+{% endmacro %}
+
 {% macro suggestion_list(suggestions) %}
 <ul class="suggestion-list">
   {% for s in suggestions %}

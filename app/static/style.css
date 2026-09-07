@@ -309,6 +309,8 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
 .tag-preferred { background: var(--preferred); color: var(--preferred-text); }
 .tag-source { background: var(--border); color: var(--text-muted); }
 .tag-status { background: var(--btn-secondary-bg); color: var(--primary); }
+/* 대체/인접 스킬 보유로 부분 인정된 항목 — 채도를 낮춰 "완전 부족"과 구분 */
+.tag-related { opacity: 0.7; font-style: italic; }
 
 .rank-list { list-style: none; padding: 0; margin: 10px 0 0; }
 .rank-list li {

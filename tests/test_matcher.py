@@ -1,4 +1,4 @@
-from app.services.matcher import compute_match, rank_matches, skill_ranking
+from app.services.matcher import MatchConfig, compute_match, rank_matches, skill_ranking
 
 
 def test_compute_match_full_coverage_scores_100(make_job):
@@ -44,6 +44,31 @@ def test_rank_matches_orders_by_score_desc(make_job):
     weak = make_job(2, "약한 매칭", ["Python", "Kubernetes", "AWS"], [])
     results = rank_matches(["Python"], [weak, strong])
     assert results[0].job_id == strong.id
+
+
+def test_related_skill_gives_partial_credit(make_job):
+    # 공고는 React 요구, 이력서엔 Vue — 사전상 대체 스킬이라 부분 점수.
+    job = make_job(1, "프론트 공고", ["React"], [])
+    exact = compute_match(["React"], job).score
+    related = compute_match(["Vue"], job).score
+    none = compute_match(["Python"], job).score
+    assert none < related < exact
+    # req 0.5 (Vue→대체) * 0.7 + pref 1.0(빈 축) * 0.3
+    assert related == round((0.5 * 0.7 + 1.0 * 0.3) * 100, 1)
+
+
+def test_related_skill_listed_in_related_required_but_still_missing(make_job):
+    job = make_job(1, "공고", ["React", "Python"], [])
+    r = compute_match(["Vue", "Python"], job)
+    assert "React" in r.missing_required          # 정확 보유는 아니므로 여전히 missing
+    assert r.related_required == ["React"]         # 대체 보유 표시
+    assert "Python" in r.matched_required
+
+
+def test_related_credit_zero_reproduces_legacy_scoring(make_job):
+    job = make_job(1, "공고", ["React"], [])
+    legacy = MatchConfig(related_credit=0.0)
+    assert compute_match(["Vue"], job, config=legacy).score == compute_match(["Python"], job).score
 
 
 def test_skill_ranking_counts_and_percentage(make_job):

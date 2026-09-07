@@ -19,21 +19,26 @@
 {% endif %}
 <p class="hint">규칙 기반으로 생성된 예상 질문 {{ prep.question_count }}개입니다. 실제 면접 질문과 다를 수 있으니 준비 방향을 잡는 용도로 활용하세요.</p>
 
-{{ question_groups(prep.groups) }}
+<section aria-labelledby="q-h">
+  <h2 id="q-h">예상 질문</h2>
+  {{ question_groups(prep.groups) }}
+</section>
 
-<div class="card">
-  <h3>면접 대비 추가 학습 주제</h3>
-  {% if prep.study_topics %}
-    {{ study_topic_list(prep.study_topics) }}
-  {% else %}
-    <p class="ok-text">이 조건에서 특별히 보완할 학습 주제가 없습니다.</p>
-  {% endif %}
-</div>
+<section aria-labelledby="study-h">
+  <h2 id="study-h">면접 대비 추가 학습 주제</h2>
+  <div class="card">
+    {% if prep.study_topics %}
+      {{ study_topic_list(prep.study_topics) }}
+    {% else %}
+      <p class="ok-text">이 조건에서 특별히 보완할 학습 주제가 없습니다.</p>
+    {% endif %}
+  </div>
+</section>
 
 {% if job %}
-<p>
+<div class="detail-actions">
   <a href="/analysis/coach?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-secondary">맞춤 코칭 보기</a>
   <a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-secondary">이력서 맞춤 편집</a>
-</p>
+</div>
 {% endif %}
 {% endblock %}

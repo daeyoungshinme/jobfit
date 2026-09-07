@@ -8,7 +8,7 @@
 
 {% macro score_card(match) %}
 <div class="card">
-  <h3>매칭 점수</h3>
+  <h2>매칭 점수</h2>
   {% if match.has_skill_data %}
   {{ score_bar(match.score) }}
   {{ match.score }}점
@@ -23,13 +23,13 @@
 
 {% macro category_gaps(gaps, empty_message=EMPTY_CATEGORY_GAPS) %}
 <div class="card">
-  <h3>부족한 스킬 (카테고리별)</h3>
+  <h2>부족한 스킬 (카테고리별)</h2>
   {% if not gaps %}
   {% if empty_message %}<p class="ok-text">{{ empty_message }}</p>{% endif %}
   {% else %}
   {% for g in gaps %}
   <div class="category-gap">
-    <h4>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h4>
+    <h3>{{ g.category }} <span class="tag tag-required">{{ g.count }}개 부족</span></h3>
     <div class="tags">
       {% for s in g.required_missing %}<span class="tag tag-required">{{ s }}</span>{% endfor %}
       {% for s in g.preferred_missing %}<span class="tag tag-preferred">{{ s }}</span>{% endfor %}
@@ -56,9 +56,9 @@
   {% for s in suggestions %}
   {% set status = s.status if s.status in ("ok", "warning", "info") else "info" %}
   <li class="suggestion suggestion-{{ status }}">
-    <span class="badge">{{ {"ok": "✓", "warning": "!", "info": "i"}[status] }}</span>
+    <span class="badge" aria-hidden="true">{{ {"ok": "✓", "warning": "!", "info": "i"}[status] }}</span>
     <div>
-      <strong>{{ s.title }}</strong>
+      <strong><span class="visually-hidden">{{ {"ok": "양호: ", "warning": "확인 필요: ", "info": "정보: "}[status] }}</span>{{ s.title }}</strong>
       <p>{{ s.detail }}</p>
     </div>
   </li>

@@ -140,19 +140,41 @@ function initThemeToggle() {
 }
 
 function initTabs() {
-  const tabButtons = document.querySelectorAll(".tab-btn[data-tab]");
-  tabButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      tabButtons.forEach((b) => {
-        b.classList.remove("active");
-        b.setAttribute("aria-selected", "false");
-      });
-      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      btn.setAttribute("aria-selected", "true");
-      document.getElementById(btn.dataset.tab).classList.add("active");
+  const tabButtons = Array.from(document.querySelectorAll(".tab-btn[data-tab]"));
+  if (!tabButtons.length) return;
+
+  const select = (btn, { focus = false } = {}) => {
+    tabButtons.forEach((b) => {
+      const on = b === btn;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+      const panel = document.getElementById(b.dataset.tab);
+      if (panel) {
+        panel.classList.toggle("active", on);
+        panel.hidden = !on;
+      }
+    });
+    if (focus) btn.focus();
+  };
+
+  tabButtons.forEach((btn, i) => {
+    btn.addEventListener("click", () => select(btn));
+    btn.addEventListener("keydown", (e) => {
+      const keys = { ArrowRight: 1, ArrowLeft: -1, Home: "first", End: "last" };
+      if (!(e.key in keys)) return;
+      e.preventDefault();
+      let next;
+      if (keys[e.key] === "first") next = tabButtons[0];
+      else if (keys[e.key] === "last") next = tabButtons[tabButtons.length - 1];
+      else next = tabButtons[(i + keys[e.key] + tabButtons.length) % tabButtons.length];
+      select(next, { focus: true });
     });
   });
+
+  // Normalise initial roving-tabindex state from whichever tab is active.
+  const active = tabButtons.find((b) => b.classList.contains("active")) || tabButtons[0];
+  select(active);
 }
 
 // Progressive enhancement for filter/status <select>s: submit on change so the

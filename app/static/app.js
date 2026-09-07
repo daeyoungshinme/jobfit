@@ -30,10 +30,17 @@ const MSG = {
   requestFailed: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.",
 };
 
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
+
 // Fade `el` out after `delay` ms, then remove it (300ms matches the .toast
 // opacity transition in style.css). Shared by the server flash and showError.
+// Skips the fade when the user prefers reduced motion.
 function fadeOutAndRemove(el, delay) {
   setTimeout(() => {
+    if (REDUCED_MOTION.matches) {
+      el.remove();
+      return;
+    }
     el.style.opacity = "0";
     setTimeout(() => el.remove(), 300);
   }, delay);
@@ -70,19 +77,41 @@ function initToast() {
 }
 
 function initThemeToggle() {
+  const root = document.documentElement;
+  const isDark = () => root.getAttribute("data-theme") === "dark";
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
   const themeToggle = document.getElementById("theme-toggle");
-  if (!themeToggle) return;
-  const setIcon = () => {
-    themeToggle.textContent =
-      document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
+
+  const sync = () => {
+    if (!themeToggle) return;
+    themeToggle.textContent = isDark() ? "☀️" : "🌙";
+    themeToggle.setAttribute("aria-pressed", String(isDark()));
+    themeToggle.setAttribute(
+      "aria-label",
+      isDark() ? "라이트 모드로 전환" : "다크 모드로 전환"
+    );
   };
-  setIcon();
+
+  // While the user has made no explicit choice, follow the OS as it changes.
+  systemDark.addEventListener("change", (e) => {
+    if (root.hasAttribute("data-theme-auto")) {
+      root.setAttribute("data-theme", e.matches ? "dark" : "light");
+      sync();
+    }
+  });
+
+  sync();
+  if (!themeToggle) return;
   themeToggle.addEventListener("click", () => {
-    const next =
-      document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
-    setIcon();
+    const next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    root.removeAttribute("data-theme-auto");
+    try {
+      localStorage.setItem("theme", next);
+    } catch (e) {
+      /* private mode / storage disabled — toggle still works for this page */
+    }
+    sync();
   });
 }
 

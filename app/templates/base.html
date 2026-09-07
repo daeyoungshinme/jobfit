@@ -6,9 +6,13 @@
   <title>{% block title %}JobFit{% endblock %}</title>
   <script>
     (function () {
-      const saved = localStorage.getItem("theme");
-      const theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-      document.documentElement.setAttribute("data-theme", theme);
+      let saved = null;
+      try { saved = localStorage.getItem("theme"); } catch (e) { /* storage disabled */ }
+      const system = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", saved || system);
+      // Mark auto-themed sessions so the OS preference keeps driving the theme
+      // (both the pre-paint value above and live changes handled in app.js).
+      if (!saved) document.documentElement.setAttribute("data-theme-auto", "");
       document.documentElement.classList.add("js");
     })();
   </script>

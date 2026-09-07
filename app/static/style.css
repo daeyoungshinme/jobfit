@@ -702,3 +702,28 @@ button.gap-chip {
     text-align: center;
   }
 }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.pagination a {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.pagination .disabled {
+  padding: 6px 14px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.pagination-status {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

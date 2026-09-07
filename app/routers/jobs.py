@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.constants import (
     JOB_NOT_FOUND_DETAIL,
     JOB_STATUS_INVALID_DETAIL,
+    MAX_RAW_TEXT_CHARS,
+    MAX_RAW_TEXT_MESSAGE,
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MESSAGE,
 )
@@ -135,6 +137,8 @@ def new_job_form(request: Request):
 
 @router.post("/preview")
 def preview_job(raw_text: str = Form(...)):
+    if len(raw_text) > MAX_RAW_TEXT_CHARS:
+        raise HTTPException(status_code=400, detail=MAX_RAW_TEXT_MESSAGE)
     raw_text = normalize_newlines(raw_text)
     parsed = parse_job_posting(raw_text)
     guessed = guess_posting_fields(raw_text)
@@ -180,6 +184,9 @@ def create_job(request: Request, form: JobForm = Depends(), db: Session = Depend
     return RedirectResponse(url=f"/jobs/{job.id}?msg=job_created", status_code=303)
 
 
+_JOBS_PER_PAGE = 30
+
+
 @router.get("")
 def list_jobs(
     request: Request,
@@ -188,17 +195,20 @@ def list_jobs(
     experience_level: list[str] = Query([]),
     region: list[str] = Query([]),
     status: list[str] = Query([]),
+    page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
 ):
-    all_jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
-
-    jobs = all_jobs
+    # 단순 동등 필터는 SQL 로. skill(JSON 배열)·region(주소 부분매칭)은 SQLite JSON
+    # 이식성 문제로 파이썬에서 거른다.
+    query = select(JobPosting).order_by(JobPosting.created_at.desc())
     if position:
-        jobs = [j for j in jobs if j.position in position]
+        query = query.where(JobPosting.position.in_(position))
     if experience_level:
-        jobs = [j for j in jobs if j.experience_level in experience_level]
+        query = query.where(JobPosting.experience_level.in_(experience_level))
     if status:
-        jobs = [j for j in jobs if j.status in status]
+        query = query.where(JobPosting.status.in_(status))
+    jobs = list(db.scalars(query))
+
     if skill:
         jobs = [
             j for j in jobs
@@ -207,8 +217,14 @@ def list_jobs(
     if region:
         jobs = [j for j in jobs if any(r in (j.address or "") for r in region)]
 
+    total = len(jobs)
+    page_count = max(1, -(-total // _JOBS_PER_PAGE))  # ceil
+    page = min(page, page_count)
+    start = (page - 1) * _JOBS_PER_PAGE
+    page_jobs = jobs[start:start + _JOBS_PER_PAGE]
+
     all_skills = sorted({
-        s for j in all_jobs
+        s for j in db.scalars(select(JobPosting))
         for s in (j.required_skills or []) + (j.preferred_skills or [])
     })
 
@@ -216,7 +232,10 @@ def list_jobs(
         request,
         "jobs_list.html",
         {
-            "jobs": jobs,
+            "jobs": page_jobs,
+            "total": total,
+            "page": page,
+            "page_count": page_count,
             "all_skills": all_skills,
             "filters": {
                 "position": position,

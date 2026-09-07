@@ -26,7 +26,7 @@ def dashboard(
     db: Session = Depends(get_db),
 ):
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
-    query = select(JobPosting)
+    query = select(JobPosting).order_by(JobPosting.created_at.desc())
     if position:
         query = query.where(JobPosting.position == position)
     jobs = list(db.scalars(query))
@@ -68,7 +68,7 @@ def profile(request: Request, resume_id: int = 0, db: Session = Depends(get_db))
     selected_resume = db.get(Resume, resume_id) if resume_id else None
     bundle = None
     if selected_resume:
-        all_jobs = list(db.scalars(select(JobPosting)))
+        all_jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
         demand = [rank.name for rank in skill_ranking(all_jobs)]
         bundle = build_platform_profiles(selected_resume, skill_demand=demand)
     return templates.TemplateResponse(

@@ -57,6 +57,7 @@ UPLOAD_NO_TEXT_MESSAGE = "파일에서 텍스트를 추출하지 못했습니다
 # backtracking 하지 않도록 파싱 진입부에서 이 길이로 잘라낸다. 실제 채용공고
 # 본문은 이보다 훨씬 짧다.
 MAX_RAW_TEXT_CHARS = 50_000
+MAX_RAW_TEXT_MESSAGE = "공고 원문이 너무 깁니다 (최대 5만 자)."
 
 RESUME_MIN_LENGTH = 300
 RESUME_MIN_ACTION_VERB_HITS = 3

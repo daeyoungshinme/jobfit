@@ -2,6 +2,7 @@
 {% block title %}채용공고 목록 - JobFit{% endblock %}
 {% block content %}
 {% from "_filter_group.html" import filter_group %}
+{% from "_pagination.html" import pagination %}
 <div class="page-header">
   <h1>채용공고 목록 {% if active_filter_count %}<span class="tag tag-source">{{ active_filter_count }}개 필터 적용됨</span>{% endif %}</h1>
   <a href="/jobs/new" class="btn-primary">+ 새 공고 등록</a>
@@ -23,9 +24,12 @@
 </details>
 
 {% if not jobs %}
-<p class="empty-state">등록된 채용공고가 없습니다. <a href="/jobs/new">지금 등록하기</a></p>
-{% elif jobs|length > 50 %}
-<p class="hint">총 {{ jobs|length }}건 중 전체를 표시 중입니다. 필터를 사용해 좁혀보세요.</p>
+<p class="empty-state">
+  {% if total == 0 and not active_filter_count %}등록된 채용공고가 없습니다. <a href="/jobs/new">지금 등록하기</a>
+  {% else %}조건에 맞는 공고가 없습니다.{% endif %}
+</p>
+{% else %}
+<p class="hint">총 {{ total }}건{% if page_count > 1 %} · {{ page }}/{{ page_count }} 페이지{% endif %}</p>
 {% endif %}
 
 <div class="card-grid">
@@ -43,4 +47,6 @@
   </a>
   {% endfor %}
 </div>
+
+{{ pagination(page, page_count, request) }}
 {% endblock %}

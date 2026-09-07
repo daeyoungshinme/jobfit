@@ -1,0 +1,17 @@
+{% macro pagination(page, page_count, request) %}
+{# 현재 쿼리스트링에서 page 만 갈아끼운 링크. no-JS 로 완전히 동작한다. #}
+{% if page_count > 1 %}
+{%- set kept -%}
+  {%- for k, v in request.query_params.multi_items() if k != 'page' -%}
+    {{ k }}={{ v | urlencode }}&amp;
+  {%- endfor -%}
+{%- endset -%}
+<nav class="pagination" aria-label="페이지 이동">
+  {% if page > 1 %}<a href="?{{ kept }}page={{ page - 1 }}" rel="prev">← 이전</a>
+  {% else %}<span class="disabled">← 이전</span>{% endif %}
+  <span class="pagination-status">{{ page }} / {{ page_count }}</span>
+  {% if page < page_count %}<a href="?{{ kept }}page={{ page + 1 }}" rel="next">다음 →</a>
+  {% else %}<span class="disabled">다음 →</span>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

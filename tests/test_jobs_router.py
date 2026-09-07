@@ -228,6 +228,39 @@ def test_list_jobs_filters_by_experience_skill_and_region(client, job_factory):
     assert "주니어 서울" in by_skill and "시니어 부산" not in by_skill
 
 
+def test_list_jobs_paginates(client, job_factory):
+    for i in range(35):
+        job_factory(title=f"공고 {i:02d}", raw_text="x")
+
+    page1 = client.get("/jobs").text
+    assert "공고 34" in page1  # 최신순 첫 페이지
+    assert "공고 00" not in page1
+    assert "다음 →" in page1
+
+    page2 = client.get("/jobs", params={"page": 2}).text
+    assert "공고 00" in page2
+    assert "이전" in page2
+
+    # 범위를 벗어난 page 는 마지막 페이지로 클램프
+    assert client.get("/jobs", params={"page": 999}).status_code == 200
+
+
+def test_list_jobs_pagination_keeps_filters(client, job_factory):
+    for i in range(35):
+        job_factory(title=f"백엔드 {i:02d}", raw_text="x", status="interview")
+    job_factory(title="프론트 관심", raw_text="x", status="interest")
+
+    page2 = client.get("/jobs", params={"status": "interview", "page": 2}).text
+    assert "status=interview" in page2  # 페이저 링크가 필터를 유지
+    assert "프론트 관심" not in page2
+
+
+def test_preview_rejects_oversized_raw_text(client):
+    response = client.post("/jobs/preview", data={"raw_text": "가" * 50_001})
+    assert response.status_code == 400
+    assert "너무 깁니다" in response.json()["detail"]
+
+
 def test_create_job_rejects_unknown_position(client, db_session):
     response = client.post(
         "/jobs",

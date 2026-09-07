@@ -23,7 +23,7 @@ pytest --cov=app --cov-report=term-missing   # 커버리지 (기본 addopts엔 �
 요청 흐름: `routers` → `services` → `models`. 템플릿은 [app/templates.py](app/templates.py)의 단일 `Jinja2Templates` 인스턴스를 모든 라우터가 `from app.templates import templates`로 가져다 쓰는 공유 구조이며, 여기에 `bulleted` 커스텀 필터와 `flash_messages` 전역이 등록되어 있습니다.
 
 - [app/main.py](app/main.py) — FastAPI 앱 진입점, 라우터 등록, `lifespan`에서 `init_db()` 호출, `/static` 마운트, `/` → `/jobs` 리다이렉트.
-- [app/templates.py](app/templates.py) — 공유 `Jinja2Templates` 인스턴스, `bulleted` 필터·`flash_messages` 전역 등록.
+- [app/templates.py](app/templates.py) — 공유 `Jinja2Templates` 인스턴스, `bulleted` 필터·`flash_messages`·`enum_label`·`deadline_dday`(마감일→D-7 임박 뱃지 dict) 전역 등록.
 - [app/static/app.js](app/static/app.js) / [style.css](app/static/style.css) — 페이지 전역에서 로드되는 단일 JS/CSS. 서버사이드 렌더링을 점진적 향상(progressive enhancement)만 하는 계층 (아래 컨벤션 참고).
 - [app/templates/base.html](app/templates/base.html) — 공통 레이아웃. `#toast`(flash), `#theme-toggle`, `#main-content` 마크업 계약을 `app.js`와 공유. 탭 UI는 `.tab-btn[data-tab]`/`.tab-panel`(현재 [resume_new.html](app/templates/resume_new.html)).
 - [app/routers/jobs.py](app/routers/jobs.py) — 채용공고 CRUD, 스킬 미리보기, OCR 업로드, 출처 사이트(source_site) 추측, 지원 상태(`status`) 빠른 변경(`POST /jobs/{id}/status`), 지원 기록 저장(`POST /jobs/{id}/application` — 상태+지원채널+지원일+사용 이력서+메모).

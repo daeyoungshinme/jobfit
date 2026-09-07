@@ -37,8 +37,9 @@
 <div class="card-grid">
   {% for job in jobs %}
   <a href="/jobs/{{ job.id }}" class="card job-card">
+    {% set dd = deadline_dday(job.deadline) %}
     <h3>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}
-      {% if job.deadline and job.deadline != "상시" %}<span class="tag tag-required">마감 {{ job.deadline }}</span>{% endif %}</h3>
+      {% if dd %}<span class="tag {{ dd.css }}" title="마감일 {{ job.deadline }}">{{ dd.badge }}</span>{% endif %}</h3>
     <p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
       {% if job.remote_policy %}· {{ enum_label("remote_policy", job.remote_policy) }}{% endif %}
       {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}

@@ -1,6 +1,6 @@
 {% from "_forms.html" import text_field, error_banner %}
 
-{% macro job_form(mode, action, submit_label, positions, experience_levels, statuses, job=None, values=None, errors=None) %}
+{% macro job_form(mode, action, submit_label, job=None, values=None, errors=None) %}
 {% set errors = errors or {} %}
 {% set v = values or job or {} %}
 {% if mode == "new" %}
@@ -21,8 +21,8 @@
         <select name="position" id="position" required class="{{ 'field-error' if errors.position }}"
           {% if errors.position %}aria-invalid="true" aria-describedby="position-error"{% endif %}>
           <option value="" {% if not v.position %}selected{% endif %} disabled>{{ SELECT_PLACEHOLDER }}</option>
-          {% for p in positions %}
-          <option value="{{ p }}" {% if v.position == p %}selected{% endif %}>{{ p }}</option>
+          {% for code, label in POSITION_CHOICES %}
+          <option value="{{ code }}" {% if v.position == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
         {% if errors.position %}<span class="field-error-text" id="position-error">{{ errors.position }}</span>{% endif %}
@@ -30,22 +30,19 @@
       <label>경력 조건
         <select name="experience_level" id="experience_level">
           <option value="" {% if not v.experience_level %}selected{% endif %}>무관/선택 안 함</option>
-          {% for e in experience_levels %}
-          <option value="{{ e }}" {% if v.experience_level == e %}selected{% endif %}>{{ e }}</option>
+          {% for code, label in EXPERIENCE_LEVEL_CHOICES %}
+          <option value="{{ code }}" {% if v.experience_level == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
-          {% if v.experience_level and v.experience_level not in experience_levels %}
-          <option value="{{ v.experience_level }}" selected>{{ v.experience_level }} (기존 값)</option>
+          {% if v.experience_level and v.experience_level not in EXPERIENCE_LEVEL_CODES %}
+          <option value="{{ v.experience_level }}" selected>{{ v.experience_level }} (직접 입력)</option>
           {% endif %}
         </select>
       </label>
       <label>지원 상태
         <select name="status" id="status">
-          {% for s in statuses %}
-          <option value="{{ s }}" {% if (v.status or JOB_STATUS_DEFAULT) == s %}selected{% endif %}>{{ s }}</option>
+          {% for code, label in JOB_STATUS_CHOICES %}
+          <option value="{{ code }}" {% if (v.status or JOB_STATUS_DEFAULT) == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
-          {% if v.status and v.status not in statuses %}
-          <option value="{{ v.status }}" selected>{{ v.status }} (기존 값)</option>
-          {% endif %}
         </select>
       </label>
     </div>

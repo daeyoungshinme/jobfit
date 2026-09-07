@@ -1,7 +1,10 @@
+import logging
+
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 from app import db as db_module
+from app.services import job_parser
 
 from .conftest import make_memory_engine
 
@@ -78,7 +81,7 @@ def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):
 
     with engine.connect() as conn:
         status = conn.execute(text("SELECT status FROM job_postings")).scalar_one()
-    assert status == "관심"
+    assert status == "interest"
 
 
 def test_migrate_adds_application_columns_with_typed_defaults(monkeypatch):
@@ -148,3 +151,69 @@ def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
     with engine.connect() as conn:
         row_again = conn.execute(text("SELECT required_text FROM job_postings")).one()
     assert row_again[0] == filled_required_text
+
+
+def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplog):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO job_postings (title, position, experience_level, status, applied_via, "
+                "raw_text, required_skills, preferred_skills, address, main_tasks, required_text, "
+                "preferred_text, source_site, created_at) VALUES "
+                "('a', '백엔드 개발자', '3~5년', '면접', '원티드', 'x', '[]', '[]', '', '', 'x', '', '', '2024-01-01'), "
+                "('b', 'backend', '2~8년', '관심', '', 'x', '[]', '[]', '', '', 'x', '', '', '2024-01-01')"
+            )
+        )
+
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="jobfit.db"):
+        db_module._migrate_enum_codes()
+
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT title, position, experience_level, status FROM job_postings ORDER BY title")
+        ).all()
+    assert rows[0] == ("a", "backend", "y3_5", "interview")   # 라벨 → 코드
+    assert rows[1] == ("b", "backend", "2~8년", "interest")   # 이미 코드 / 범위는 보존
+    assert any("2~8년" in r.message for r in caplog.records)  # 미상 값 로깅
+
+
+def test_backfill_isolates_a_failing_row_and_logs_it(monkeypatch, caplog):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO job_postings (title, position, raw_text, required_skills, preferred_skills, "
+                "address, main_tasks, required_text, preferred_text, source_site, created_at) VALUES "
+                "('정상', '백엔드', '[자격요건]\nPython', '[]', '[]', '', '', '', '', '', '2024-01-01'), "
+                "('폭탄', '백엔드', 'BOOM', '[]', '[]', '', '', '', '', '', '2024-01-01')"
+            )
+        )
+
+    real_parse = job_parser.parse_job_posting
+
+    def flaky_parse(raw_text):
+        if "BOOM" in raw_text:
+            raise ValueError("pathological posting")
+        return real_parse(raw_text)
+
+    monkeypatch.setattr(job_parser, "parse_job_posting", flaky_parse)
+
+    with caplog.at_level(logging.WARNING, logger="jobfit.db"):
+        db_module._backfill_job_postings()  # 예외를 밖으로 던지지 않는다
+
+    with engine.connect() as conn:
+        rows = dict(conn.execute(text("SELECT title, required_text FROM job_postings")).all())
+    assert rows["정상"] != ""       # 정상 행은 채워짐
+    assert rows["폭탄"] == ""       # 실패 행은 건너뜀
+    assert any("백필 실패" in r.message for r in caplog.records)

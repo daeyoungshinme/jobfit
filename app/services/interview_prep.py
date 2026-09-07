@@ -11,6 +11,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from app.enums import EXPERIENCE_LEVEL, POSITION
 from app.models import JobPosting, Resume
 from app.schemas import (
     InterviewPrep,
@@ -23,15 +24,9 @@ from app.services.matcher import compute_match
 from app.services.resume_reviewer import review_resume
 from app.services.resume_sections import first_line_label, sections_for_resume, split_blocks
 from app.services.skill_extractor import skill_category_map
+from app.services.text_utils import QUANT_PATTERN, UNKNOWN_CATEGORY, dedupe, strip_bullet, truncate
 
 GUIDE_PATH = Path(__file__).resolve().parent.parent / "data" / "interview_guide.json"
-
-_UNKNOWN_CATEGORY = "기타"
-
-# resume_reviewer._QUANT_PATTERN 의 로컬 복제 — 서비스 간에는 public 심볼만
-# 임포트하는 컨벤션이라 작은 정규식은 여기서 다시 정의한다.
-_QUANT = re.compile(r"\d+(\.\d+)?\s*(%|퍼센트|배|건|명|시간|일|개월|년|원|억|만)")
-_BULLET_PREFIX = re.compile(r"^\s*(?:[-*•·▪‣◦▶○]|\d+[.)])\s+")
 
 _CAT_ROLE_FIT = "직무 적합성"
 _CAT_TECH = "기술 심화"
@@ -72,21 +67,6 @@ def _fmt(template: str, **kwargs) -> str:
         return template
 
 
-def _truncate(text: str, limit: int = 60) -> str:
-    text = text.strip()
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
-
-
-def _dedupe(items: list[str]) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
-    for item in items:
-        if item not in seen:
-            seen.add(item)
-            out.append(item)
-    return out
-
-
 def _q(category: str, question: str, rationale: str = "") -> InterviewQuestion:
     return InterviewQuestion(category=category, question=question, rationale=rationale)
 
@@ -95,26 +75,27 @@ def _role_fit_questions(job: JobPosting) -> list[InterviewQuestion]:
     guide = load_interview_guide()
     out: list[InterviewQuestion] = []
 
-    position_guide = guide.get("positions", {}).get(job.position, {})
+    position_label = POSITION.label_of(job.position)
+    position_guide = guide.get("positions", {}).get(position_label, {})
     for question in position_guide.get("fit_questions", []):
-        out.append(_q(_CAT_ROLE_FIT, question, f"{job.position} 직무에 자주 나오는 질문입니다."))
+        out.append(_q(_CAT_ROLE_FIT, question, f"{position_label} 직무에 자주 나오는 질문입니다."))
 
     task_template = guide.get("main_task_question_template", '"{task}" 관련 경험을 설명해주세요.')
     tasks: list[str] = []
     for line in (job.main_tasks or "").splitlines():
-        cleaned = _BULLET_PREFIX.sub("", line.strip(), count=1).strip(" \t·-–—")
+        cleaned = strip_bullet(line).strip(" \t·-–—")
         if len(cleaned) > 6:
             tasks.append(cleaned)
-    for task in _dedupe(tasks)[:_MAX_MAIN_TASK_Q]:
-        out.append(_q(_CAT_ROLE_FIT, _fmt(task_template, task=_truncate(task)), "공고 주요 업무에서 도출한 질문입니다."))
+    for task in dedupe(tasks)[:_MAX_MAIN_TASK_Q]:
+        out.append(_q(_CAT_ROLE_FIT, _fmt(task_template, task=truncate(task)), "공고 주요 업무에서 도출한 질문입니다."))
 
     return out
 
 
 def _tech_skill_order(owned: list[str], match: MatchResult | None) -> list[str]:
     if match is not None:
-        return _dedupe([*match.matched_required, *match.matched_preferred])
-    return _dedupe(owned)
+        return dedupe([*match.matched_required, *match.matched_preferred])
+    return dedupe(owned)
 
 
 def _tech_deep_questions(owned: list[str], match: MatchResult | None) -> list[InterviewQuestion]:
@@ -133,7 +114,7 @@ def _tech_deep_questions(owned: list[str], match: MatchResult | None) -> list[In
     for skill in _tech_skill_order(owned, match)[:_MAX_TECH_Q]:
         templates = (
             skills_guide.get(skill, {}).get("question_templates")
-            or categories_guide.get(cat_map.get(skill, _UNKNOWN_CATEGORY), {}).get("question_templates")
+            or categories_guide.get(cat_map.get(skill, UNKNOWN_CATEGORY), {}).get("question_templates")
             or [_GENERIC_TECH_TEMPLATE]
         )
         out.append(_q(_CAT_TECH, _fmt(templates[0], skill=skill), rationale))
@@ -152,7 +133,7 @@ def _project_questions(sections: dict[str, str]) -> list[InterviewQuestion]:
         if not label:
             continue
         out.append(_q(_CAT_PROJECT, _fmt(project_template, project=label), "이력서에 기재된 프로젝트/경력입니다."))
-        if not _QUANT.search(block):
+        if not QUANT_PATTERN.search(block):
             out.append(_q(_CAT_PROJECT, _fmt(quant_followup, project=label), "이 항목에 정량적 성과 표현이 없어 나올 수 있는 후속 질문입니다."))
     return out
 
@@ -191,10 +172,13 @@ def _resume_signal_questions(resume: Resume) -> list[InterviewQuestion]:
 
 
 def _experience_bucket(experience_level: str) -> str | None:
-    if experience_level == "신입":
-        return "신입"
-    if experience_level in {"1~3년", "3~5년", "5~10년", "10년 이상"}:
-        return "경력"
+    """경력 코드 또는 자유 입력 범위("2~8년") → 행동 질문 버킷("신입"/"경력"/None)."""
+    member = EXPERIENCE_LEVEL.get(EXPERIENCE_LEVEL.normalize(experience_level))
+    if member is not None:
+        return member.meta.get("bucket")
+    lead = re.match(r"\s*(\d+)", experience_level or "")
+    if lead:
+        return "신입" if int(lead.group(1)) == 0 else "경력"
     return None
 
 
@@ -233,7 +217,7 @@ def _study_point_for_skill(skill: str) -> str:
     cat_map = skill_category_map()
     points = (
         guide.get("skills", {}).get(skill, {}).get("study_points")
-        or guide.get("categories", {}).get(cat_map.get(skill, _UNKNOWN_CATEGORY), {}).get("study_points")
+        or guide.get("categories", {}).get(cat_map.get(skill, UNKNOWN_CATEGORY), {}).get("study_points")
         or [guide.get("gap", {}).get("study_point_template", "{skill}: 공식 문서로 기본기를 학습하세요.")]
     )
     return _fmt(points[0], skill=skill)
@@ -268,16 +252,17 @@ def _study_topics(owned: list[str], match: MatchResult | None, job: JobPosting |
                 title=f"{name} 학습", detail=_study_point_for_skill(name),
                 priority="중간", source=f"우대 스킬 갭: {name}",
             )
-        for topic in guide.get("positions", {}).get(job.position, {}).get("study_topics", []):
+        position_label = POSITION.label_of(job.position)
+        for topic in guide.get("positions", {}).get(position_label, {}).get("study_topics", []):
             _add_topic(
                 topics, seen,
                 title=topic.get("title", ""), detail=topic.get("detail", ""),
-                priority="기본", source=f"직무 공통: {job.position}",
+                priority="기본", source=f"직무 공통: {position_label}",
             )
     else:
         by_category: dict[str, list[str]] = {}
-        for name in _dedupe(owned):
-            by_category.setdefault(cat_map.get(name, _UNKNOWN_CATEGORY), []).append(name)
+        for name in dedupe(owned):
+            by_category.setdefault(cat_map.get(name, UNKNOWN_CATEGORY), []).append(name)
         categories_guide = guide.get("categories", {})
         for category, names in by_category.items():
             points = categories_guide.get(category, {}).get("study_points")

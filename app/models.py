@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.constants import JOB_STATUS_DEFAULT
 from app.db import Base
+from app.enums import JOB_STATUS_DEFAULT
 
 
 def _now() -> datetime:

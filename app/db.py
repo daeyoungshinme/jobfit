@@ -1,13 +1,22 @@
+import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from app.constants import JOB_STATUS_DEFAULT
+from app.enums import JOB_STATUS_DEFAULT
+
+logger = logging.getLogger("jobfit.db")
 
 DB_PATH = Path(__file__).resolve().parent.parent / "jobfit.db"
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# Bumped whenever a data migration step is added to _run_data_migrations().
+# Stored in schema_meta so a fresh/older DB can tell which one-off migrations
+# it still needs. Column additions themselves stay idempotent via
+# _migrate_table_columns and don't need a version bump.
+SCHEMA_VERSION = 2
 
 # (column, DDL type, default literal) for JobPosting columns added after the
 # table was first created. SQLite has no ALTER-TABLE-based migration tooling
@@ -35,9 +44,9 @@ _JOB_POSTING_NEW_COLUMNS = [
 
 # Same pattern as _JOB_POSTING_NEW_COLUMNS, for the `resumes` table. Empty for
 # now — the wiring exists so a future Resume column just needs an entry here
-# (plus a dedicated backfill call in init_db() if existing rows must be filled).
+# (plus a dedicated backfill call in _run_data_migrations() if existing rows
+# must be filled).
 _RESUME_NEW_COLUMNS: list[tuple[str, str, str]] = []
-
 
 class Base(DeclarativeBase):
     pass
@@ -74,9 +83,43 @@ def _migrate_table_columns(table_name: str, columns: list[tuple[str, str, str]])
             conn.commit()
 
 
+def _ensure_schema_meta_table() -> None:
+    """Create the key/value table that tracks the schema version and which
+    one-off data migrations have already run."""
+    with engine.begin() as conn:
+        conn.execute(
+            text("CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        )
+
+
+def _get_meta(key: str) -> str | None:
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT value FROM schema_meta WHERE key = :k"), {"k": key}).first()
+    return row[0] if row else None
+
+
+def _set_meta(key: str, value: str) -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO schema_meta (key, value) VALUES (:k, :v) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+            ),
+            {"k": key, "v": value},
+        )
+
+
 def _backfill_job_postings() -> None:
     """Re-derive the section fields, address, and source_site for postings saved
-    before those columns existed (or left half-filled by an interrupted run)."""
+    before those columns existed (or left half-filled by an interrupted run).
+
+    Runs once (guarded by a schema_meta flag in _run_data_migrations). The
+    query itself is still idempotent (only touches rows with required_text ==
+    ""), so a re-run after a partial failure self-heals. Each row is committed
+    on its own: a single pathological raw_text must not abort startup or drag
+    the rows already parsed back down with it, so failures are rolled back,
+    logged, and skipped — not raised.
+    """
     from sqlalchemy import select
 
     from app.models import JobPosting
@@ -89,29 +132,99 @@ def _backfill_job_postings() -> None:
 
     db = SessionLocal()
     try:
-        jobs = db.scalars(
-            select(JobPosting).where(JobPosting.required_text == "", JobPosting.raw_text != "")
+        pending = list(
+            db.scalars(
+                select(JobPosting.id).where(
+                    JobPosting.required_text == "", JobPosting.raw_text != ""
+                )
+            )
         )
-        for job in jobs:
-            apply_parsed_sections(job, parse_job_posting(job.raw_text))
-            if not job.address:
-                job.address = guess_posting_fields(job.raw_text).address
+        for job_id in pending:
+            job = db.get(JobPosting, job_id)
+            try:
+                apply_parsed_sections(job, parse_job_posting(job.raw_text))
+                if not job.address:
+                    job.address = guess_posting_fields(job.raw_text).address
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.warning("job_posting %s 백필 실패 — 건너뜁니다", job_id, exc_info=True)
 
-        for job in db.scalars(select(JobPosting).where(JobPosting.source_site == "", JobPosting.url != "")):
-            job.source_site = guess_source_site(job.url)
+        stale_sites = list(
+            db.scalars(
+                select(JobPosting.id).where(
+                    JobPosting.source_site == "", JobPosting.url != ""
+                )
+            )
+        )
+        for job_id in stale_sites:
+            job = db.get(JobPosting, job_id)
+            try:
+                job.source_site = guess_source_site(job.url)
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.warning(
+                    "job_posting %s source_site 추측 실패 — 건너뜁니다", job_id, exc_info=True
+                )
+    finally:
+        db.close()
 
+
+def _migrate_enum_codes() -> None:
+    """Convert Korean-label enum values stored before app/enums.py existed to
+    their ascii codes (status/position/experience_level/applied_via). Values
+    that don't resolve to a known code or label — free-form experience ranges
+    like "2~8년" — are left untouched and logged.
+    """
+    from sqlalchemy import select, update
+
+    from app.enums import APPLY_CHANNEL, EXPERIENCE_LEVEL, JOB_STATUS, POSITION
+    from app.models import JobPosting
+
+    field_enums = {
+        "status": JOB_STATUS,
+        "position": POSITION,
+        "experience_level": EXPERIENCE_LEVEL,
+        "applied_via": APPLY_CHANNEL,
+    }
+    db = SessionLocal()
+    try:
+        for field, enum_set in field_enums.items():
+            col = getattr(JobPosting, field)
+            for (value,) in db.execute(select(col).distinct()):
+                if not value:
+                    continue
+                code = enum_set.normalize(value)
+                if code is None:
+                    # experience_level 은 "3년 이상"·"2~8년" 같은 자유 입력 범위가
+                    # 정상이므로 INFO, 나머지 필드의 미상 값은 의심스러우니 WARNING.
+                    level = logger.info if field == "experience_level" else logger.warning
+                    level("job_postings.%s 값 %r 은 알려진 코드/라벨이 아님 — 그대로 둡니다", field, value)
+                elif code != value:
+                    db.execute(update(JobPosting).where(col == value).values({field: code}))
         db.commit()
     finally:
         db.close()
+
+
+def _run_data_migrations() -> None:
+    """One-off data migrations, each guarded by its own schema_meta flag so it
+    runs exactly once per database. Add new steps here and bump SCHEMA_VERSION."""
+    if _get_meta("enum_codes_migrated") != "done":
+        _migrate_enum_codes()
+        _set_meta("enum_codes_migrated", "done")
+    if _get_meta("job_postings_backfilled") != "done":
+        _backfill_job_postings()
+        _set_meta("job_postings_backfilled", "done")
 
 
 def init_db():
     from app import models  # noqa: F401  (register models on Base.metadata)
 
     Base.metadata.create_all(bind=engine)
+    _ensure_schema_meta_table()
     _migrate_table_columns("job_postings", _JOB_POSTING_NEW_COLUMNS)
     _migrate_table_columns("resumes", _RESUME_NEW_COLUMNS)
-    # Always re-run: the backfill query itself is idempotent (only touches rows
-    # with required_text == ""), so this also self-heals rows left over from a
-    # prior run that added the columns but failed partway through backfilling.
-    _backfill_job_postings()
+    _run_data_migrations()
+    _set_meta("schema_version", str(SCHEMA_VERSION))

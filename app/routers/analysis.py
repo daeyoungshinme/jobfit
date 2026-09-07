@@ -3,7 +3,6 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.constants import POSITIONS
 from app.db import get_db
 from app.models import JobPosting, Resume
 from app.routers._common import ResumeContentForm
@@ -43,7 +42,6 @@ def dashboard(
         "dashboard.html",
         {
             "resumes": resumes,
-            "positions": POSITIONS,
             "selected_resume": selected_resume,
             "selected_position": position,
             "matches": matches,

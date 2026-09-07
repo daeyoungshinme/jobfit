@@ -9,12 +9,14 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 
-from app.constants import JOB_STATUSES
+from app.enums import JOB_STATUS
 
 STALE_AFTER_DAYS = 14
-_ADVANCED = {"서류합격", "면접", "최종합격", "불합격"}
-_APPLIED = {"지원완료"} | _ADVANCED
-_EARLY_STAGE = {"관심", "지원예정"}
+_ADVANCED = JOB_STATUS.codes_where("advanced")
+_APPLIED = JOB_STATUS.codes_where("applied")
+_EARLY_STAGE = JOB_STATUS.codes_where("early")
+_AWAITING = JOB_STATUS.codes_where("awaiting")  # 지원완료(아직 미진행)
+_INTERVIEWING = JOB_STATUS.codes_where("interviewing")
 
 
 @dataclass
@@ -56,7 +58,7 @@ def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
             job_id=job.id,
             title=job.title,
             company=job.company or "",
-            status=job.status or "",
+            status=JOB_STATUS.normalize(job.status) or (job.status or ""),
             applied_via=job.applied_via or "",
             applied_at=job.applied_at or "",
             is_inbound=bool(job.is_inbound),
@@ -65,7 +67,7 @@ def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
         for job in jobs
     ]
 
-    status_counts = [(s, sum(1 for r in rows if r.status == s)) for s in JOB_STATUSES]
+    status_counts = [(s, sum(1 for r in rows if r.status == s)) for s in JOB_STATUS.codes()]
     channel_counts = Counter(r.applied_via for r in rows if r.applied_via).most_common()
     applied_count = sum(1 for r in rows if r.applied_at or r.status in _APPLIED)
     recent = sorted(
@@ -74,12 +76,12 @@ def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
     awaiting = [
         r
         for r in rows
-        if r.status == "지원완료"
+        if r.status in _AWAITING
         and r.days_since_applied is not None
         and r.days_since_applied >= STALE_AFTER_DAYS
     ]
     inbound_leads = [r for r in rows if r.is_inbound and r.status in _EARLY_STAGE]
-    interviewing = [r for r in rows if r.status == "면접"]
+    interviewing = [r for r in rows if r.status in _INTERVIEWING]
 
     return ActivityReport(
         total=len(rows),

@@ -7,19 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.constants import (
-    APPLY_CHANNELS,
-    EXPERIENCE_LEVELS,
     JOB_NOT_FOUND_DETAIL,
-    JOB_STATUS_DEFAULT,
     JOB_STATUS_INVALID_DETAIL,
-    JOB_STATUSES,
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MESSAGE,
-    POSITIONS,
-    REGIONS,
-    SOURCE_SITE_TO_CHANNEL,
 )
 from app.db import get_db
+from app.enums import APPLY_CHANNEL, EXPERIENCE_LEVEL, JOB_STATUS, JOB_STATUS_DEFAULT, POSITION
 from app.models import JobPosting, Resume
 from app.routers._common import get_or_404
 from app.services.job_parser import (
@@ -39,11 +33,12 @@ _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _suggested_channel(source_site: str) -> str:
+    """자유 입력 source_site 문자열에서 지원 채널 코드를 추천한다 (없으면 "")."""
     site = (source_site or "").lower()
-    return next(
-        (channel for key, channel in SOURCE_SITE_TO_CHANNEL.items() if key.lower() in site),
-        "",
-    )
+    for member in APPLY_CHANNEL:
+        if any(key.lower() in site for key in member.meta.get("source_site_keys", ())):
+            return member.code
+    return ""
 
 _JOB_REQUIRED_FIELD_MESSAGES = {
     "title": "공고 제목을 입력해주세요.",
@@ -58,7 +53,7 @@ _JOB_FORM_FIELDS = (
 
 
 class JobForm:
-    """The job create/edit form's 9 fields as a single FastAPI dependency.
+    """The job create/edit form's 10 fields as a single FastAPI dependency.
 
     Spelled out once here instead of repeated as Form(...) params in both
     create_job and update_job plus an error-render values dict.
@@ -82,9 +77,11 @@ class JobForm:
         self.address = address
         self.url = url
         self.source_site = source_site
-        self.position = position
-        self.experience_level = experience_level
-        self.status = status
+        # 코드값·(구)라벨 어느 쪽으로 들어와도 코드로 정규화한다. experience_level 은
+        # "2~8년" 같은 자유 입력 범위도 허용하므로 미상이면 원문을 그대로 둔다.
+        self.position = POSITION.normalize(position) or position.strip()
+        self.experience_level = EXPERIENCE_LEVEL.normalize(experience_level) or experience_level.strip()
+        self.status = JOB_STATUS.normalize(status) or status.strip()
         self.raw_text = raw_text
         # 체크박스는 체크 시 "on", 미체크 시 미전송. 문자열로 받아 명시적으로 bool 로.
         self.is_inbound = bool(is_inbound)
@@ -97,9 +94,11 @@ class JobForm:
             {"title": self.title, "position": self.position, "raw_text": self.raw_text},
             _JOB_REQUIRED_FIELD_MESSAGES,
         )
-        # Empty status is fine (_persist_job falls back to JOB_STATUS_DEFAULT);
-        # a non-empty value that isn't a known status is a crafted/stale POST.
-        if self.status and self.status not in JOB_STATUSES:
+        # 비어 있으면 OK (_persist_job 가 기본값으로 채움). 값이 있는데 알려진
+        # 코드가 아니면 조작됐거나 오래된 폼에서 온 POST 다.
+        if self.position and not POSITION.has(self.position):
+            errors["position"] = "알 수 없는 직무입니다."
+        if self.status and not JOB_STATUS.has(self.status):
             errors["status"] = JOB_STATUS_INVALID_DETAIL
         return errors
 
@@ -124,29 +123,14 @@ def _render_job_form(request: Request, template: str, form: JobForm, errors: dic
     return templates.TemplateResponse(
         request,
         template,
-        {
-            "job": job,
-            "positions": POSITIONS,
-            "experience_levels": EXPERIENCE_LEVELS,
-            "statuses": JOB_STATUSES,
-            "errors": errors,
-            "values": form.as_dict(),
-        },
+        {"job": job, "errors": errors, "values": form.as_dict()},
         status_code=422,
     )
 
 
 @router.get("/new")
 def new_job_form(request: Request):
-    return templates.TemplateResponse(
-        request,
-        "job_new.html",
-        {
-            "positions": POSITIONS,
-            "experience_levels": EXPERIENCE_LEVELS,
-            "statuses": JOB_STATUSES,
-        },
-    )
+    return templates.TemplateResponse(request, "job_new.html", {})
 
 
 @router.post("/preview")
@@ -233,10 +217,6 @@ def list_jobs(
         "jobs_list.html",
         {
             "jobs": jobs,
-            "positions": POSITIONS,
-            "experience_levels": EXPERIENCE_LEVELS,
-            "regions": REGIONS,
-            "statuses": JOB_STATUSES,
             "all_skills": all_skills,
             "filters": {
                 "position": position,
@@ -265,8 +245,6 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
             "job": job,
             "sections_detected": sections_detected,
             "resumes": resumes,
-            "statuses": JOB_STATUSES,
-            "apply_channels": APPLY_CHANNELS,
             "suggested_channel": _suggested_channel(job.source_site),
             "applied_resume": applied_resume,
         },
@@ -276,16 +254,7 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
 @router.get("/{job_id}/edit")
 def edit_job_form(job_id: int, request: Request, db: Session = Depends(get_db)):
     job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
-    return templates.TemplateResponse(
-        request,
-        "job_edit.html",
-        {
-            "job": job,
-            "positions": POSITIONS,
-            "experience_levels": EXPERIENCE_LEVELS,
-            "statuses": JOB_STATUSES,
-        },
-    )
+    return templates.TemplateResponse(request, "job_edit.html", {"job": job})
 
 
 @router.post("/{job_id}/edit")
@@ -306,9 +275,10 @@ def update_job_status(job_id: int, status: str = Form(...), db: Session = Depend
     job = db.get(JobPosting, job_id)
     if job is None:
         return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
-    if status not in JOB_STATUSES:
+    code = JOB_STATUS.normalize(status)
+    if code is None:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
-    job.status = status
+    job.status = code
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_updated", status_code=303)
 
@@ -333,20 +303,23 @@ def update_job_application(
         return RedirectResponse(url="/jobs?msg=job_not_found", status_code=303)
 
     applied_at = applied_at.strip()
-    if status and status not in JOB_STATUSES:
+    status_code = JOB_STATUS.normalize(status) if status else ""
+    channel_code = APPLY_CHANNEL.normalize(applied_via) if applied_via else ""
+    if status and status_code is None:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
-    if applied_via and applied_via not in APPLY_CHANNELS:
+    if applied_via and channel_code is None:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
     if applied_at and not _ISO_DATE.match(applied_at):
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
 
-    if status:
-        job.status = status
-    job.applied_via = applied_via
+    if status_code:
+        job.status = status_code
+    job.applied_via = channel_code or ""
     job.applied_resume_id = applied_resume_id or 0
     job.memo = memo
-    # 편의: 날짜 없이 지원완료로 표시하면 오늘 날짜를 찍어준다.
-    if job.status == "지원완료" and not applied_at:
+    # 편의: 날짜 없이 "지원완료"(awaiting) 상태로 표시하면 오늘 날짜를 찍어준다.
+    current = JOB_STATUS.get(job.status)
+    if current and current.meta.get("awaiting") and not applied_at:
         applied_at = date.today().isoformat()
     job.applied_at = applied_at
     db.commit()

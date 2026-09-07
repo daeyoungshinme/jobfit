@@ -18,8 +18,8 @@
   <label>직무 필터
     <select name="position" data-autosubmit>
       <option value="">전체</option>
-      {% for p in positions %}
-      <option value="{{ p }}" {% if selected_position == p %}selected{% endif %}>{{ p }}</option>
+      {% for code, label in POSITION_CHOICES %}
+      <option value="{{ code }}" {% if selected_position == code %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </label>
@@ -66,7 +66,7 @@
         {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener" class="job-source-link">원본 ↗</a>{% endif %}
         <br><span class="meta">{{ m.company }}</span>
       </td>
-      <td data-label="상태">{% if m.status %}<span class="tag tag-status">{{ m.status }}</span>{% endif %}</td>
+      <td data-label="상태">{% if m.status %}<span class="tag tag-status">{{ enum_label("job_status", m.status) }}</span>{% endif %}</td>
       <td data-label="매칭 점수">
         {% if m.has_skill_data %}
         {{ score_bar(m.score) }}

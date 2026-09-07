@@ -1,0 +1,15 @@
+{% macro timeline(entries) %}
+{% if entries %}
+<ol class="timeline">
+  {% for e in entries %}
+  <li class="timeline-item timeline-{{ e.kind }}">
+    <span class="timeline-at">{{ e.at }}</span>
+    <span class="timeline-label">{{ e.label }}</span>
+    {% if e.detail %}<span class="timeline-detail">{{ e.detail }}</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="empty-state">아직 기록된 활동이 없습니다.</p>
+{% endif %}
+{% endmacro %}

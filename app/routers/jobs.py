@@ -18,6 +18,12 @@ from app.db import get_db
 from app.enums import APPLY_CHANNEL, EXPERIENCE_LEVEL, JOB_STATUS, JOB_STATUS_DEFAULT, POSITION
 from app.models import JobPosting, Resume
 from app.routers._common import get_or_404, load_job, normalize_job_status
+from app.services import application_log
+from app.services.application_log import (
+    add_interview_event,
+    delete_events_for_job,
+    record_status_change,
+)
 from app.services.job_parser import (
     apply_parsed_sections,
     guess_posting_fields,
@@ -265,6 +271,7 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
             "resumes": resumes,
             "suggested_channel": _suggested_channel(job.source_site),
             "applied_resume": applied_resume,
+            "timeline_entries": application_log.timeline(application_log.events_for_job(db, job_id)),
         },
     )
 
@@ -283,6 +290,7 @@ def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Ses
     if errors:
         return _render_job_form(request, "job_edit.html", form, errors, job=job)
 
+    record_status_change(db, job, form.status or JOB_STATUS_DEFAULT)
     _persist_job(job, form)
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_updated", status_code=303)
@@ -296,6 +304,7 @@ def update_job_status(job_id: int, status: str = Form(...), db: Session = Depend
     code = normalize_job_status(status)
     if not code:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
+    record_status_change(db, job, code)
     job.status = code
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_updated", status_code=303)
@@ -331,6 +340,7 @@ def update_job_application(
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
 
     if status_code:
+        record_status_change(db, job, status_code)
         job.status = status_code
     job.applied_via = channel_code or ""
     job.applied_resume_id = applied_resume_id or 0
@@ -344,11 +354,30 @@ def update_job_application(
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_saved", status_code=303)
 
 
+@router.post("/{job_id}/interview")
+def add_job_interview(
+    job_id: int,
+    event_at: str = Form(""),
+    detail: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    job, redirect = load_job(db, job_id)
+    if redirect:
+        return redirect
+    event_at = event_at.strip()
+    if not _ISO_DATE.match(event_at):
+        return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
+    add_interview_event(db, job_id, event_at, detail.strip())
+    db.commit()
+    return RedirectResponse(url=f"/jobs/{job_id}?msg=job_interview_added", status_code=303)
+
+
 @router.post("/{job_id}/delete")
 def delete_job(job_id: int, db: Session = Depends(get_db)):
     job, redirect = load_job(db, job_id)
     if redirect:
         return redirect
+    delete_events_for_job(db, job_id)
     db.delete(job)
     db.commit()
     return RedirectResponse(url="/jobs?msg=job_deleted", status_code=303)

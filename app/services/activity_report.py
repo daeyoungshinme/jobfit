@@ -6,12 +6,12 @@
 """
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
+from app.constants import STALE_AFTER_DAYS
 from app.enums import JOB_STATUS
 
-STALE_AFTER_DAYS = 14
 _ADVANCED = JOB_STATUS.codes_where("advanced")
 _APPLIED = JOB_STATUS.codes_where("applied")
 _EARLY_STAGE = JOB_STATUS.codes_where("early")
@@ -29,6 +29,7 @@ class ActivityRow:
     applied_at: str
     is_inbound: bool
     days_since_applied: int | None
+    next_interview: str = ""  # 가장 가까운 예정 면접일 (ISO), 없으면 ""
 
 
 @dataclass
@@ -42,6 +43,7 @@ class ActivityReport:
     awaiting_response: list[ActivityRow]
     inbound_leads: list[ActivityRow]
     interviewing: list[ActivityRow]
+    upcoming_interviews: list[ActivityRow] = field(default_factory=list)
 
 
 def _days_since(iso: str, today: date) -> int | None:
@@ -51,10 +53,27 @@ def _days_since(iso: str, today: date) -> int | None:
         return None
 
 
-def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
+def _next_interview_by_job(interview_events, today: date) -> dict[int, str]:
+    """job_id → 가장 가까운 예정(오늘 이후) 면접일 ISO 문자열."""
+    best: dict[int, str] = {}
+    for event in interview_events or []:
+        try:
+            when = date.fromisoformat(event.event_at)
+        except (ValueError, TypeError):
+            continue
+        if when < today:
+            continue
+        current = best.get(event.job_id)
+        if current is None or event.event_at < current:
+            best[event.job_id] = event.event_at
+    return best
+
+
+def build_activity_report(jobs, today: date | None = None, interview_events=None) -> ActivityReport:
     # applied_at 은 사용자 입력(로컬 날짜) 이지만 서버 기준일이 없으면 UTC 로 계산한다
     # — 자정 경계에서 최대 하루 오차. 정확도가 필요하면 라우터가 today 를 주입한다.
     today = today or datetime.now(timezone.utc).date()
+    next_interview = _next_interview_by_job(interview_events, today)
     rows = [
         ActivityRow(
             job_id=job.id,
@@ -65,6 +84,7 @@ def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
             applied_at=job.applied_at or "",
             is_inbound=bool(job.is_inbound),
             days_since_applied=_days_since(job.applied_at or "", today),
+            next_interview=next_interview.get(job.id, ""),
         )
         for job in jobs
     ]
@@ -84,6 +104,9 @@ def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
     ]
     inbound_leads = [r for r in rows if r.is_inbound and r.status in _EARLY_STAGE]
     interviewing = [r for r in rows if r.status in _INTERVIEWING]
+    upcoming = sorted(
+        (r for r in rows if r.next_interview), key=lambda r: r.next_interview
+    )
 
     return ActivityReport(
         total=len(rows),
@@ -95,4 +118,5 @@ def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
         awaiting_response=awaiting,
         inbound_leads=inbound_leads,
         interviewing=interviewing,
+        upcoming_interviews=upcoming,
     )

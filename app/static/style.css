@@ -729,3 +729,18 @@ button.gap-chip {
   color: var(--text-muted);
   font-size: 0.9rem;
 }
+
+.timeline { list-style: none; padding: 0; margin: 8px 0 0; }
+.timeline-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-at { color: var(--text-muted); min-width: 92px; }
+.timeline-label { font-weight: 600; }
+.timeline-detail { color: var(--text-muted); }
+.timeline-interview .timeline-label { color: var(--primary); }

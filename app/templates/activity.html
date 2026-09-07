@@ -108,6 +108,21 @@
   {% else %}
   <p class="empty-state">면접 단계 공고가 없습니다.</p>
   {% endif %}
-  <p class="hint">면접 일정은 각 공고 메모에 기록하세요 (전용 일정 필드는 아직 없습니다).</p>
+</div>
+
+<div class="card">
+  <h3>예정된 면접</h3>
+  {% if report.upcoming_interviews %}
+  <ul class="rank-list">
+    {% for r in report.upcoming_interviews %}
+    <li>
+      <span class="rank-name">{{ r.next_interview }} · <a href="/jobs/{{ r.job_id }}">{{ r.title }}</a>
+        <span class="meta">{{ r.company }}</span></span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">예정된 면접이 없습니다. 각 공고 상세에서 "면접 일정 추가"로 기록하세요.</p>
+  {% endif %}
 </div>
 {% endblock %}

@@ -81,6 +81,18 @@ def test_recent_applications_desc_and_capped_at_10():
     assert report.recent_applications[0].applied_at > report.recent_applications[-1].applied_at
 
 
+def test_upcoming_interviews_from_events():
+    job = _job(id=1, status="interview")
+    events = [
+        SimpleNamespace(job_id=1, kind="interview", event_at="2026-09-03"),  # 과거
+        SimpleNamespace(job_id=1, kind="interview", event_at="2026-09-20"),
+        SimpleNamespace(job_id=1, kind="interview", event_at="2026-09-12"),
+    ]
+    report = build_activity_report([job], today=TODAY, interview_events=events)
+    assert [r.job_id for r in report.upcoming_interviews] == [1]
+    assert report.upcoming_interviews[0].next_interview == "2026-09-12"  # 가장 가까운 것
+
+
 def test_today_defaults_to_utc_date():
     utc_today = datetime.now(timezone.utc).date()
     stale = _job(id=1, status="applied", applied_at=(utc_today - timedelta(days=30)).isoformat())

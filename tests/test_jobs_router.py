@@ -297,6 +297,35 @@ def test_quick_status_update_redirects_with_flash(client, db_session, job_factor
     assert job.status == "doc_pass"
 
 
+def test_status_change_records_an_application_event(client, db_session, job_factory):
+    from app.services.application_log import events_for_job
+
+    job = job_factory(status="interest")
+    client.post(f"/jobs/{job.id}/status", data={"status": "doc_pass"}, follow_redirects=False)
+    client.post(f"/jobs/{job.id}/status", data={"status": "doc_pass"}, follow_redirects=False)  # no-op
+
+    events = events_for_job(db_session, job.id)
+    assert [(e.from_status, e.to_status) for e in events] == [("interest", "doc_pass")]
+
+
+def test_deleting_a_job_removes_its_events(client, db_session, job_factory):
+    from app.services.application_log import events_for_job
+
+    job = job_factory(status="interest")
+    client.post(f"/jobs/{job.id}/status", data={"status": "applied"}, follow_redirects=False)
+    client.post(f"/jobs/{job.id}/interview", data={"event_at": "2026-12-01", "detail": "1차"}, follow_redirects=False)
+    assert events_for_job(db_session, job.id)
+
+    client.post(f"/jobs/{job.id}/delete", follow_redirects=False)
+    assert events_for_job(db_session, job.id) == []
+
+
+def test_add_interview_rejects_bad_date(client, job_factory):
+    job = job_factory()
+    r = client.post(f"/jobs/{job.id}/interview", data={"event_at": "2026/12/01"}, follow_redirects=False)
+    assert r.headers["location"] == f"/jobs/{job.id}?msg=job_application_invalid"
+
+
 def test_quick_status_update_missing_job_redirects(client):
     response = client.post("/jobs/99999/status", data={"status": "interview"}, follow_redirects=False)
     assert response.status_code == 303

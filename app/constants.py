@@ -36,6 +36,7 @@ FLASH_MESSAGES = {
     "job_status_invalid": (JOB_STATUS_INVALID_DETAIL, "error"),
     "job_application_saved": ("지원 기록이 저장되었습니다.", "success"),
     "job_application_invalid": ("입력한 지원 정보를 확인해주세요.", "error"),
+    "job_interview_added": ("면접 일정이 추가되었습니다.", "success"),
     "resume_uploaded": ("이력서가 업로드되었습니다.", "success"),
     "resume_created": ("이력서가 등록되었습니다.", "success"),
     "resume_deleted": ("이력서가 삭제되었습니다.", "success"),
@@ -58,6 +59,9 @@ UPLOAD_NO_TEXT_MESSAGE = "파일에서 텍스트를 추출하지 못했습니다
 # 본문은 이보다 훨씬 짧다.
 MAX_RAW_TEXT_CHARS = 50_000
 MAX_RAW_TEXT_MESSAGE = "공고 원문이 너무 깁니다 (최대 5만 자)."
+
+# 지원완료 후 이 일수가 지나도록 상태 변화가 없으면 "무응답 경과"로 분류한다.
+STALE_AFTER_DAYS = 14
 
 RESUME_MIN_LENGTH = 300
 RESUME_MIN_ACTION_VERB_HITS = 3

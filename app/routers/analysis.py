@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import JobPosting, Resume
+from app.models import ApplicationEvent, JobPosting, Resume
 from app.routers._common import ResumeContentForm, load_resume_and_job
 from app.services.activity_report import build_activity_report
 from app.services.interview_prep import build_interview_prep
@@ -55,10 +55,13 @@ def dashboard(
 @router.get("/activity")
 def activity(request: Request, db: Session = Depends(get_db)):
     jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
+    interview_events = list(
+        db.scalars(select(ApplicationEvent).where(ApplicationEvent.kind == "interview"))
+    )
     return templates.TemplateResponse(
         request,
         "activity.html",
-        {"report": build_activity_report(jobs)},
+        {"report": build_activity_report(jobs, interview_events=interview_events)},
     )
 
 

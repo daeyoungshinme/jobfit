@@ -3,6 +3,7 @@
 {% block content %}
 {% from "_pick_target.html" import pick_target %}
 {% from "_forms.html" import delete_form %}
+{% from "_timeline.html" import timeline %}
 <a href="/jobs" class="back-link">&larr; 목록으로</a>
 <h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}</h1>
 <p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
@@ -45,6 +46,20 @@
   {% endif %}
   <button type="submit" class="btn-secondary">저장</button>
 </form>
+
+<div class="card">
+  <h3>지원 이력</h3>
+  {{ timeline(timeline_entries) }}
+  <form method="post" action="/jobs/{{ job.id }}/interview" class="filter-bar" style="margin-top:12px;">
+    <label>면접 일정 추가
+      <input type="date" name="event_at" required>
+    </label>
+    <label>메모 (차수·형식 등)
+      <input type="text" name="detail" placeholder="예: 1차 기술 면접 (화상)">
+    </label>
+    <button type="submit" class="btn-secondary">면접 일정 추가</button>
+  </form>
+</div>
 
 {% if resumes %}
 <div class="card filter-bar">

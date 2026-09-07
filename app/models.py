@@ -47,6 +47,28 @@ class JobPosting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
+class ApplicationEvent(Base):
+    """공고별 지원 이벤트 로그 (상태 전이 / 메모 / 면접 일정).
+
+    `job_id` 는 의도적으로 FK 가 아니다 — 코드베이스 전체가 FK 를 쓰지 않고
+    (JobPosting.applied_resume_id 와 같은 소프트 참조 패턴), 조회는 항상 job_id
+    로 시작하므로 고아 이벤트도 무해하다. `index=True` 는 무결성이 아니라 조회
+    성능용이다. 삭제 정리는 jobs.py::delete_job 이 수동으로 한다.
+    """
+
+    __tablename__ = "application_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(Integer, index=True)  # 소프트 참조 (FK 아님)
+    kind: Mapped[str] = mapped_column(String(20))  # "status" | "note" | "interview"
+    from_status: Mapped[str] = mapped_column(String(20), default="")  # enum 코드
+    to_status: Mapped[str] = mapped_column(String(20), default="")  # enum 코드
+    # 사용자 입력 날짜(면접 일정 등)는 다른 폼 필드처럼 ISO 문자열로 저장한다.
+    event_at: Mapped[str] = mapped_column(String(10), default="")
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class Resume(Base):
     __tablename__ = "resumes"
 

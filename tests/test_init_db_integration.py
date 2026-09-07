@@ -39,6 +39,13 @@ def test_init_db_creates_schema_and_is_repeatable(monkeypatch, tmp_path):
     assert version == str(db_module.SCHEMA_VERSION)
     assert backfill_flag == "done"
 
+    with engine.connect() as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+        }
+    assert "application_events" in tables  # 신규 테이블도 create_all 로 생성된다
+
 
 def test_init_db_backfill_runs_once(monkeypatch, tmp_path):
     engine = _use_temp_db(monkeypatch, tmp_path)

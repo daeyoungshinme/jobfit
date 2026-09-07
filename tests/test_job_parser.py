@@ -158,14 +158,41 @@ def test_tech_stack_section_folds_into_required_skills():
     assert "Docker" not in parsed.preferred_skills
 
 
-def test_benefits_section_is_not_stored_but_ends_preceding_section():
-    # 혜택/복지 is treated as a stop marker: it carries no job-fit signal so it
-    # isn't kept, but it must still close the 우대사항 section so benefit prose
-    # doesn't leak into preferred_text.
+def test_benefits_section_is_captured_and_ends_preceding_section():
+    # 혜택/복지 는 이제 별도 섹션으로 저장된다. job-fit 분석엔 안 쓰지만 상세
+    # 페이지 표시용이고, 여전히 우대사항 섹션의 경계로 작동한다.
     parsed = parse_job_posting(SAMPLE_WITH_ALL_SECTIONS)
     assert "건강검진" not in parsed.preferred_text
     assert "건강검진" not in parsed.required_text
-    assert not hasattr(parsed, "benefits_text")
+    assert "건강검진 지원" in parsed.benefits_text
+
+
+def test_process_section_is_captured():
+    text = "[자격요건]\n- Python\n\n[채용 전형]\n1. 서류\n2. 코딩테스트\n3. 최종 면접"
+    parsed = parse_job_posting(text)
+    assert "코딩테스트" in parsed.process_text
+    assert "코딩테스트" not in parsed.required_text
+
+
+def test_guess_employment_remote_deadline_salary():
+    text = (
+        "계약직 백엔드 개발자를 채용합니다. 주 2회 재택 근무 가능.\n"
+        "연봉 5,000~7,000만원 (협의).\n접수 마감: 2026.03.15\n\n[자격요건]\n- Python"
+    )
+    g = guess_posting_fields(text)
+    assert g.employment_type == "contract"
+    assert g.remote_policy == "hybrid"
+    assert g.deadline == "2026-03-15"
+    assert "5,000" in g.salary_text
+
+
+def test_guess_extras_empty_when_absent():
+    g = guess_posting_fields("[자격요건]\n- Python 경험 3년")
+    assert g.employment_type == "" and g.remote_policy == "" and g.deadline == "" and g.salary_text == ""
+
+
+def test_guess_deadline_always_hiring():
+    assert guess_posting_fields("상시 채용합니다.\n[자격요건]\nPython").deadline == "상시"
 
 
 def test_guess_address_from_label():

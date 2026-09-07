@@ -255,6 +255,37 @@ def test_list_jobs_pagination_keeps_filters(client, job_factory):
     assert "프론트 관심" not in page2
 
 
+def test_create_job_saves_and_guesses_extra_fields(client, db_session):
+    client.post("/jobs", data={
+        "title": "공고", "position": "backend",
+        "raw_text": "계약직 채용. 재택 근무. 접수 마감: 2026.05.01\n[자격요건]\nPython\n[복지 및 혜택]\n- 맥북 지원",
+        "remote_policy": "hybrid",  # 폼 값이 추측을 이긴다
+    }, follow_redirects=False)
+    job = db_session.query(JobPosting).one()
+    assert job.employment_type == "contract"  # 원문에서 추측
+    assert job.remote_policy == "hybrid"       # 폼 값 우선
+    assert job.deadline == "2026-05-01"
+    assert "맥북 지원" in job.benefits_text
+
+
+def test_list_jobs_filters_by_employment_and_remote(client, job_factory):
+    job_factory(title="계약 원격", raw_text="x", employment_type="contract", remote_policy="remote")
+    job_factory(title="정규 출근", raw_text="x", employment_type="fulltime", remote_policy="office")
+
+    by_emp = client.get("/jobs", params={"employment_type": "contract"}).text
+    assert "계약 원격" in by_emp and "정규 출근" not in by_emp
+
+    by_remote = client.get("/jobs", params={"remote_policy": "office"}).text
+    assert "정규 출근" in by_remote and "계약 원격" not in by_remote
+
+
+def test_preview_returns_extra_guessed_fields(client):
+    r = client.post("/jobs/preview", data={"raw_text": "프리랜서 모집. 완전 재택.\n[자격요건]\nPython"})
+    body = r.json()
+    assert body["employment_type"] == "freelance"
+    assert body["remote_policy"] == "remote"
+
+
 def test_preview_rejects_oversized_raw_text(client):
     response = client.post("/jobs/preview", data={"raw_text": "가" * 50_001})
     assert response.status_code == 400

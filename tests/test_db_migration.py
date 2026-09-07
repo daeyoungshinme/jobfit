@@ -184,6 +184,36 @@ def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplo
     assert any("2~8년" in r.message for r in caplog.records)  # 미상 값 로깅
 
 
+def test_backfill_job_extras_reparses_and_guesses(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+    from app.models import JobPosting
+
+    s = db_module.SessionLocal()
+    try:
+        s.add(JobPosting(
+            title="공고", position="backend",
+            raw_text="계약직 채용, 완전 재택.\n[자격요건]\nPython\n[복지 및 혜택]\n- 맥북",
+            required_skills=[], preferred_skills=[],
+        ))
+        s.commit()
+    finally:
+        s.close()
+
+    db_module._backfill_job_extras()
+
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT employment_type, remote_policy, benefits_text FROM job_postings")
+        ).one()
+    assert row[0] == "contract"
+    assert row[1] == "remote"
+    assert "맥북" in row[2]
+
+
 def test_backfill_updated_at_seeds_from_created_at(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)

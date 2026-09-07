@@ -32,7 +32,9 @@ def test_ocr_route_maps_runtime_error_to_400(client, monkeypatch):
 
 
 def test_job_and_resume_form_pages_render(client, job_factory, resume_factory):
-    job = job_factory()
+    job = job_factory(employment_type="contract", remote_policy="hybrid", deadline="2026-05-01")
     resume = resume_factory()
     for url in ("/jobs/new", f"/jobs/{job.id}/edit", "/resumes/new", f"/resumes/{resume.id}/edit"):
         assert client.get(url).status_code == 200
+    detail = client.get(f"/jobs/{job.id}").text
+    assert "계약직" in detail and "하이브리드" in detail and "마감 2026-05-01" in detail

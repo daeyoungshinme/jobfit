@@ -16,7 +16,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 # Stored in schema_meta so a fresh/older DB can tell which one-off migrations
 # it still needs. Column additions themselves stay idempotent via
 # _migrate_table_columns and don't need a version bump.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # (column, DDL type, default literal) for JobPosting columns added after the
 # table was first created. SQLite has no ALTER-TABLE-based migration tooling
@@ -40,6 +40,12 @@ _JOB_POSTING_NEW_COLUMNS = [
     # SQLite 는 ALTER ADD COLUMN 에 CURRENT_TIMESTAMP 기본값을 못 쓴다 — NULL 로
     # 추가하고 _backfill_updated_at() 이 기존 행을 created_at 으로 채운다.
     ("updated_at", "DATETIME", "NULL"),
+    ("employment_type", "VARCHAR(20)", "''"),
+    ("remote_policy", "VARCHAR(20)", "''"),
+    ("salary_text", "VARCHAR(200)", "''"),
+    ("deadline", "VARCHAR(20)", "''"),
+    ("benefits_text", "TEXT", "''"),
+    ("process_text", "TEXT", "''"),
 ]
 
 # NOTE: an older jobfit.db may still carry a physical "benefits" column from a
@@ -246,6 +252,41 @@ def _backfill_updated_at() -> None:
         )
 
 
+def _backfill_job_extras() -> None:
+    """Re-parse raw_text to fill benefits/process sections and guess the new
+    employment_type / remote_policy / deadline / salary fields for postings
+    saved before those columns existed. Row-isolated."""
+    from sqlalchemy import select
+
+    from app.models import JobPosting
+    from app.services.job_parser import (
+        apply_parsed_sections,
+        guess_posting_fields,
+        parse_job_posting,
+    )
+
+    db = SessionLocal()
+    try:
+        ids = list(db.scalars(select(JobPosting.id).where(JobPosting.raw_text != "")))
+        for job_id in ids:
+            job = db.get(JobPosting, job_id)
+            try:
+                apply_parsed_sections(job, parse_job_posting(job.raw_text))
+                guessed = guess_posting_fields(job.raw_text)
+                job.employment_type = job.employment_type or guessed.employment_type
+                job.remote_policy = job.remote_policy or guessed.remote_policy
+                job.deadline = job.deadline or guessed.deadline
+                job.salary_text = job.salary_text or guessed.salary_text
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.warning(
+                    "job_posting %s 부가정보 백필 실패 — 건너뜁니다", job_id, exc_info=True
+                )
+    finally:
+        db.close()
+
+
 def _run_data_migrations() -> None:
     """One-off data migrations, each guarded by its own schema_meta flag so it
     runs exactly once per database. Add new steps here and bump SCHEMA_VERSION."""
@@ -261,6 +302,9 @@ def _run_data_migrations() -> None:
     if _get_meta("job_updated_at_backfilled") != "done":
         _backfill_updated_at()
         _set_meta("job_updated_at_backfilled", "done")
+    if _get_meta("job_extras_backfilled") != "done":
+        _backfill_job_extras()
+        _set_meta("job_extras_backfilled", "done")
 
 
 def init_db():

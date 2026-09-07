@@ -34,6 +34,14 @@ class JobPosting(Base):
     # 원문에서 섹션 헤더(자격요건/우대사항 등)를 인식했는지. job_parser 가 저장하고
     # job_detail 이 "자동 인식 실패" 안내를 띄울지 판단하는 데 쓴다.
     sections_detected: Mapped[bool] = mapped_column(Boolean, default=False)
+    # 공고 부가 정보. employment_type/remote_policy 는 enum 코드, 나머지는 자유 텍스트
+    # (deadline 은 ISO 'YYYY-MM-DD' 또는 "상시"). job_parser 가 추측하고 폼에서 수정 가능.
+    employment_type: Mapped[str] = mapped_column(String(20), default="")
+    remote_policy: Mapped[str] = mapped_column(String(20), default="")
+    salary_text: Mapped[str] = mapped_column(String(200), default="")
+    deadline: Mapped[str] = mapped_column(String(20), default="")
+    benefits_text: Mapped[str] = mapped_column(Text, default="")
+    process_text: Mapped[str] = mapped_column(Text, default="")
     # 지원 활동 추적. applied_at 은 사용자 입력값이라 다른 폼 필드처럼 문자열로 저장한다
     # (ISO 'YYYY-MM-DD'). applied_resume_id 는 의도적으로 FK 가 아니다 — 0 = 없음,
     # 참조된 이력서가 삭제돼도 템플릿이 안내 문구로 저하한다.

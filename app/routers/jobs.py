@@ -15,7 +15,15 @@ from app.constants import (
     MAX_UPLOAD_MESSAGE,
 )
 from app.db import get_db
-from app.enums import APPLY_CHANNEL, EXPERIENCE_LEVEL, JOB_STATUS, JOB_STATUS_DEFAULT, POSITION
+from app.enums import (
+    APPLY_CHANNEL,
+    EMPLOYMENT_TYPE,
+    EXPERIENCE_LEVEL,
+    JOB_STATUS,
+    JOB_STATUS_DEFAULT,
+    POSITION,
+    REMOTE_POLICY,
+)
 from app.models import JobPosting, Resume
 from app.routers._common import get_or_404, load_job, normalize_job_status
 from app.services import application_log
@@ -57,6 +65,7 @@ _JOB_REQUIRED_FIELD_MESSAGES = {
 _JOB_FORM_FIELDS = (
     "title", "company", "address", "url", "source_site",
     "position", "experience_level", "status", "raw_text", "is_inbound",
+    "employment_type", "remote_policy", "salary_text", "deadline",
 )
 
 
@@ -79,6 +88,10 @@ class JobForm:
         status: str = Form(""),
         raw_text: str = Form(""),
         is_inbound: str = Form(""),
+        employment_type: str = Form(""),
+        remote_policy: str = Form(""),
+        salary_text: str = Form(""),
+        deadline: str = Form(""),
     ):
         self.title = title
         self.company = company
@@ -93,6 +106,10 @@ class JobForm:
         self.raw_text = raw_text
         # 체크박스는 체크 시 "on", 미체크 시 미전송. 문자열로 받아 명시적으로 bool 로.
         self.is_inbound = bool(is_inbound)
+        self.employment_type = EMPLOYMENT_TYPE.normalize(employment_type) or ""
+        self.remote_policy = REMOTE_POLICY.normalize(remote_policy) or ""
+        self.salary_text = salary_text.strip()
+        self.deadline = deadline.strip()
 
     def as_dict(self) -> dict:
         return {name: getattr(self, name) for name in _JOB_FORM_FIELDS}
@@ -125,6 +142,13 @@ def _persist_job(job: JobPosting, form: JobForm) -> None:
     job.is_inbound = form.is_inbound
     job.raw_text = raw_text
     apply_parsed_sections(job, parse_job_posting(raw_text))
+    # 폼 값이 있으면 그대로, 없으면 원문에서 추측 (source_site 와 같은 패턴 —
+    # no-JS 사용자도 최소한의 자동 채움을 받도록).
+    guessed = guess_posting_fields(raw_text)
+    job.employment_type = form.employment_type or guessed.employment_type
+    job.remote_policy = form.remote_policy or guessed.remote_policy
+    job.salary_text = form.salary_text or guessed.salary_text
+    job.deadline = form.deadline or guessed.deadline
 
 
 def _render_job_form(request: Request, template: str, form: JobForm, errors: dict, job=None):
@@ -156,6 +180,10 @@ def preview_job(raw_text: str = Form(...)):
         "position": guessed.position,
         "experience_level": guessed.experience_level,
         "address": guessed.address,
+        "employment_type": guessed.employment_type,
+        "remote_policy": guessed.remote_policy,
+        "deadline": guessed.deadline,
+        "salary_text": guessed.salary_text,
     }
 
 
@@ -201,6 +229,8 @@ def list_jobs(
     experience_level: list[str] = Query([]),
     region: list[str] = Query([]),
     status: list[str] = Query([]),
+    employment_type: list[str] = Query([]),
+    remote_policy: list[str] = Query([]),
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
 ):
@@ -213,6 +243,10 @@ def list_jobs(
         query = query.where(JobPosting.experience_level.in_(experience_level))
     if status:
         query = query.where(JobPosting.status.in_(status))
+    if employment_type:
+        query = query.where(JobPosting.employment_type.in_(employment_type))
+    if remote_policy:
+        query = query.where(JobPosting.remote_policy.in_(remote_policy))
     jobs = list(db.scalars(query))
 
     if skill:
@@ -249,9 +283,12 @@ def list_jobs(
                 "experience_level": experience_level,
                 "region": region,
                 "status": status,
+                "employment_type": employment_type,
+                "remote_policy": remote_policy,
             },
             "active_filter_count": (
-                len(position) + len(skill) + len(experience_level) + len(region) + len(status)
+                len(position) + len(skill) + len(experience_level) + len(region)
+                + len(status) + len(employment_type) + len(remote_policy)
             ),
         },
     )

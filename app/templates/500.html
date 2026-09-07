@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}오류가 발생했습니다 - JobFit{% endblock %}
+{% block content %}
+<div class="empty-state-page">
+  <h1>일시적인 오류가 발생했습니다</h1>
+  <p class="hint">{{ detail or "요청을 처리하는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요. 계속되면 서버 로그를 확인하세요." }}</p>
+  <p>
+    <a href="/jobs" class="btn-primary">채용공고 목록</a>
+    <a href="/resumes" class="btn-secondary">이력서 목록</a>
+  </p>
+</div>
+{% endblock %}

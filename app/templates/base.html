@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="JobFit — 채용공고와 이력서를 규칙 기반으로 분석해 매칭 점수, 부족한 스킬, 맞춤 편집·면접 준비를 돕는 로컬 도구.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20x='50'%20y='54'%20font-size='76'%20text-anchor='middle'%20dominant-baseline='central'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
   <title>{% block title %}JobFit{% endblock %}</title>
   <script>
     (function () {
@@ -41,11 +44,20 @@
       <button id="theme-toggle" class="theme-toggle" type="button" aria-label="테마 전환">🌙</button>
     </div>
   </header>
+  <noscript>
+    <div class="container">
+      <p class="toast">JavaScript가 꺼져 있어도 등록·수정·필터·삭제 등 핵심 기능은 그대로 동작합니다.
+        이미지 텍스트 추출(OCR), 스킬 미리보기, 시스템 테마 자동 전환 같은 편의 기능만 제한됩니다.</p>
+    </div>
+  </noscript>
   {% set flash = flash_messages.get(request.query_params.get("msg")) if flash_messages else None %}
-  {% if flash %}<div id="toast" class="toast toast-{{ flash[1] }}" role="{{ 'alert' if flash[1] == 'error' else 'status' }}">{{ flash[0] }}</div>{% endif %}
+  <div id="toast-region" aria-live="polite">{%- if flash %}<div id="toast" class="toast toast-{{ flash[1] }}" role="{{ 'alert' if flash[1] == 'error' else 'status' }}">{{ flash[0] }}</div>{% endif -%}</div>
   <main class="container" id="main-content">
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    JobFit — 채용공고·이력서 분석 도구. 모든 데이터는 이 컴퓨터의 <code>jobfit.db</code>에만 저장되며 외부로 전송되지 않습니다.
+  </footer>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -2,7 +2,8 @@
 {% block title %}{{ job.title }} 맞춤 이력서 코칭 - JobFit{% endblock %}
 {% block content %}
 {% from "_coaching.html" import score_card, category_gaps, suggestion_list %}
-<a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
+{% from "_breadcrumb.html" import breadcrumb %}
+{{ breadcrumb([("매칭 대시보드", "/analysis/dashboard?resume_id=" ~ resume.id), (job.title, "/jobs/" ~ job.id), ("코칭", None)]) }}
 <h1>{{ job.title }} 맞춤 이력서 코칭</h1>
 <p class="meta">이력서: {{ resume.label }} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }})</p>
 

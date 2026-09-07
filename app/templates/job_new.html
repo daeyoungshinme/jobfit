@@ -2,6 +2,8 @@
 {% block title %}채용공고 등록 - JobFit{% endblock %}
 {% block content %}
 {% from "_job_form.html" import job_form %}
+{% from "_breadcrumb.html" import breadcrumb %}
+{{ breadcrumb([("채용공고", "/jobs"), ("새 공고 등록", None)]) }}
 <h1>채용공고 등록</h1>
 {{ job_form(mode="new", action="/jobs", submit_label="저장", values=values, errors=errors) }}
 {% endblock %}

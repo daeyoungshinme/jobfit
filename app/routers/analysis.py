@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.constants import STALE_AFTER_DAYS
 from app.db import get_db
 from app.models import ApplicationEvent, JobPosting, Resume
 from app.routers._common import ResumeContentForm, load_resume_and_job
@@ -72,7 +73,10 @@ def activity(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "activity.html",
-        {"report": build_activity_report(jobs, interview_events=interview_events)},
+        {
+            "report": build_activity_report(jobs, interview_events=interview_events),
+            "STALE_AFTER_DAYS": STALE_AFTER_DAYS,
+        },
     )
 
 

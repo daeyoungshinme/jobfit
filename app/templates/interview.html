@@ -3,7 +3,12 @@
 {% block content %}
 {% from "_coaching.html" import score_card %}
 {% from "_interview.html" import question_groups, study_topic_list %}
-<a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
+{% from "_breadcrumb.html" import breadcrumb %}
+{% if job %}
+{{ breadcrumb([("매칭 대시보드", "/analysis/dashboard?resume_id=" ~ resume.id), (job.title, "/jobs/" ~ job.id), ("면접 질문", None)]) }}
+{% else %}
+{{ breadcrumb([("이력서", "/resumes"), (resume.label, "/resumes/" ~ resume.id), ("면접 질문", None)]) }}
+{% endif %}
 <h1>면접 예상 질문 &amp; 스터디 가이드</h1>
 <p class="meta">이력서: {{ resume.label }}{% if job %} · 공고: <a href="/jobs/{{ job.id }}">{{ job.title }}</a> ({{ job.company }}){% endif %}</p>
 

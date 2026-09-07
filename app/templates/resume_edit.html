@@ -3,9 +3,10 @@
 {% block content %}
 {% from "_forms.html" import text_field, error_banner, raw_text_editor %}
 {% from "_resume_fields.html" import resume_fields, career_meta_fields %}
+{% from "_breadcrumb.html" import breadcrumb %}
 {% set errors = errors or {} %}
 {% set v = values or {} %}
-<a href="/resumes/{{ resume.id }}" class="back-link">&larr; 이력서로</a>
+{{ breadcrumb([("이력서", "/resumes"), (resume.label, "/resumes/" ~ resume.id), ("수정", None)]) }}
 <h1>이력서 수정</h1>
 
 {{ error_banner(errors) }}

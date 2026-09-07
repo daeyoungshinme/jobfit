@@ -12,6 +12,8 @@ from app.constants import (
 from app.db import get_db
 from app.models import JobPosting, Resume
 from app.routers._common import ResumeContentForm, get_or_404
+from app.services.job_parser import guess_position_code
+from app.services.profile_exporter import guess_total_years
 from app.services.resume_editor import apply_resume_content, new_resume, validate_resume_content
 from app.services.resume_parser import extract_text_from_upload
 from app.services.resume_reviewer import review_resume
@@ -62,6 +64,8 @@ async def upload_resume(
         label=label,
         source_type="file",
         raw_text=raw_text,
+        total_years=str(guess_total_years(raw_text) or ""),
+        target_position=guess_position_code(label, raw_text),
         structured={"original_filename": file.filename},
     )
     db.add(resume)

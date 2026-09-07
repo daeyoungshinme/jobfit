@@ -15,6 +15,8 @@
   {{ filter_group("experience_level", "경력", EXPERIENCE_LEVEL_CHOICES, filters.experience_level) }}
   {{ filter_group("status", "상태", JOB_STATUS_CHOICES, filters.status) }}
   {{ filter_group("region", "지역", REGION_CHOICES, filters.region) }}
+  {{ filter_group("employment_type", "고용형태", EMPLOYMENT_TYPE_CHOICES, filters.employment_type) }}
+  {{ filter_group("remote_policy", "근무형태", REMOTE_POLICY_CHOICES, filters.remote_policy) }}
   {{ filter_group("skill", "기술 스킬", all_skills, filters.skill) }}
   <div class="filter-actions">
     <button type="submit" class="btn-secondary">필터 적용</button>
@@ -35,8 +37,10 @@
 <div class="card-grid">
   {% for job in jobs %}
   <a href="/jobs/{{ job.id }}" class="card job-card">
-    <h3>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}</h3>
+    <h3>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}
+      {% if job.deadline and job.deadline != "상시" %}<span class="tag tag-required">마감 {{ job.deadline }}</span>{% endif %}</h3>
     <p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
+      {% if job.remote_policy %}· {{ enum_label("remote_policy", job.remote_policy) }}{% endif %}
       {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
     </p>
     <div class="tags">

@@ -286,7 +286,11 @@ def _study_topics(owned: list[str], match: MatchResult | None, job: JobPosting |
 
 
 def build_interview_prep(resume: Resume, job: JobPosting | None) -> InterviewPrep:
-    match = compute_match(resume.extracted_skills or [], job) if job is not None else None
+    match = (
+        compute_match(resume.extracted_skills or [], job, resume=resume)
+        if job is not None
+        else None
+    )
     sections = sections_for_resume(resume)
     owned = list(resume.extracted_skills or [])
 

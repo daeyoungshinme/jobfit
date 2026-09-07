@@ -52,8 +52,8 @@
       헤드헌터·리크루터가 먼저 제안한 공고입니다 (인바운드)
     </label>
 
-    <details class="filter-group" {% if v.address or v.url or v.source_site %}open{% endif %}>
-      <summary>추가 정보 (선택)</summary>
+    <details class="filter-group" {% if v.address or v.url or v.source_site or v.employment_type or v.remote_policy or v.deadline or v.salary_text %}open{% endif %}>
+      <summary>추가 정보 (선택 · 원문에서 일부 자동 감지)</summary>
       {{ text_field("address", "회사 주소", v.address, placeholder="예: 서울특별시 강남구 테헤란로 123") }}
       <label>공고 URL
         <input type="url" name="url" id="url" placeholder="https://..." value="{{ v.url or '' }}">
@@ -61,6 +61,32 @@
       <label>공고 플랫폼 <span class="hint-inline">(URL 입력 시 자동 감지, 필요하면 직접 수정)</span>
         <input type="text" name="source_site" id="source_site" placeholder="예: 사람인, 잡코리아, 원티드" value="{{ v.source_site or '' }}">
       </label>
+      <div class="row">
+        <label>고용형태
+          <select name="employment_type" id="employment_type">
+            <option value="">선택 안 함</option>
+            {% for code, label in EMPLOYMENT_TYPE_CHOICES %}
+            <option value="{{ code }}" {% if v.employment_type == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>근무 형태
+          <select name="remote_policy" id="remote_policy">
+            <option value="">선택 안 함</option>
+            {% for code, label in REMOTE_POLICY_CHOICES %}
+            <option value="{{ code }}" {% if v.remote_policy == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>마감일 <span class="hint-inline">(YYYY-MM-DD 또는 "상시")</span>
+          <input type="text" name="deadline" id="deadline" placeholder="예: 2026-03-15" value="{{ v.deadline or '' }}">
+        </label>
+        <label>연봉/급여
+          <input type="text" name="salary_text" id="salary_text" placeholder="예: 연봉 5,000~7,000만원" value="{{ v.salary_text or '' }}">
+        </label>
+      </div>
     </details>
   </div>
 

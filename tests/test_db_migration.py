@@ -52,17 +52,27 @@ def test_migrate_table_columns_adds_missing_columns_and_is_idempotent(monkeypatc
     assert columns_again == columns
 
 
-def test_migrate_resumes_with_empty_column_list_is_noop(monkeypatch):
+def test_migrate_resumes_adds_career_columns_with_typed_defaults(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)
     with engine.begin() as conn:
         conn.execute(text("CREATE TABLE resumes (id INTEGER PRIMARY KEY, label VARCHAR(200))"))
+        conn.execute(text("INSERT INTO resumes (label) VALUES ('기존 이력서')"))
 
     db_module._migrate_table_columns("resumes", db_module._RESUME_NEW_COLUMNS)
 
     with engine.connect() as conn:
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info(resumes)"))}
-    assert columns == {"id", "label"}
+        assert {"total_years", "target_position"} <= columns
+        row = conn.execute(text("SELECT total_years, target_position FROM resumes")).one()
+    assert row[0] == 0  # INTEGER default literal, not the string "0"
+    assert row[1] == ""
+
+    # Second run is a no-op.
+    db_module._migrate_table_columns("resumes", db_module._RESUME_NEW_COLUMNS)
+    with engine.connect() as conn:
+        columns_again = {row[1] for row in conn.execute(text("PRAGMA table_info(resumes)"))}
+    assert columns_again == columns
 
 
 def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):
@@ -182,6 +192,76 @@ def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplo
     assert rows[0] == ("a", "backend", "y3_5", "interview")   # 라벨 → 코드
     assert rows[1] == ("b", "backend", "2~8년", "interest")   # 이미 코드 / 범위는 보존
     assert any("2~8년" in r.message for r in caplog.records)  # 미상 값 로깅
+
+
+def test_backfill_job_extras_reparses_and_guesses(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+    from app.models import JobPosting
+
+    s = db_module.SessionLocal()
+    try:
+        s.add(JobPosting(
+            title="공고", position="backend",
+            raw_text="계약직 채용, 완전 재택.\n[자격요건]\nPython\n[복지 및 혜택]\n- 맥북",
+            required_skills=[], preferred_skills=[],
+        ))
+        s.commit()
+    finally:
+        s.close()
+
+    db_module._backfill_job_extras()
+
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT employment_type, remote_policy, benefits_text FROM job_postings")
+        ).one()
+    assert row[0] == "contract"
+    assert row[1] == "remote"
+    assert "맥북" in row[2]
+
+
+def test_backfill_resume_career_guesses_years_and_position(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE resumes (id INTEGER PRIMARY KEY, label VARCHAR(200), "
+                "source_type VARCHAR(20), raw_text TEXT, structured JSON, extracted_skills JSON, "
+                "created_at DATETIME, updated_at DATETIME)"
+            )
+        )
+    db_module._migrate_table_columns("resumes", db_module._RESUME_NEW_COLUMNS)
+    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+    from app.models import Resume
+
+    s = db_module.SessionLocal()
+    try:
+        s.add(Resume(
+            label="백엔드 이력서", source_type="form",
+            raw_text="[경력]\n7년차 백엔드 개발자, Python/FastAPI\n[기술 스택]\nPython",
+            structured={}, extracted_skills=["Python"],
+        ))
+        s.commit()
+    finally:
+        s.close()
+
+    db_module._backfill_resume_career()
+
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT total_years, target_position FROM resumes")).one()
+    assert row[0] == 7
+    assert row[1] == "backend"
+
+    # 멱등: 이미 채워진 행은 그대로.
+    db_module._backfill_resume_career()
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT total_years FROM resumes")).scalar_one() == 7
 
 
 def test_backfill_updated_at_seeds_from_created_at(monkeypatch):

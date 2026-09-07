@@ -152,7 +152,10 @@ function initSkillPreview() {
 
   // Fields the user has typed/selected into by hand are never overwritten by an
   // auto-guess, even if they later clear them back out.
-  const autoFillIds = ["title", "company", "address", "position", "experience_level"];
+  const autoFillIds = [
+    "title", "company", "address", "position", "experience_level",
+    "employment_type", "remote_policy", "deadline", "salary_text",
+  ];
   const touched = new Set();
   autoFillIds.forEach((id) => {
     const el = document.getElementById(id);

@@ -19,6 +19,17 @@ def compose_form_raw_text(career: str, projects: str, education: str, skills_tex
     return f"[경력]\n{career}\n\n[프로젝트]\n{projects}\n\n[학력]\n{education}\n\n[기술 스택]\n{skills_text}"
 
 
+def _coerce_years(value) -> int | None:
+    """폼의 total_years 입력(문자열/숫자/빈칸) → 0~60 정수. 빈칸이면 None
+    (= '변경 없음', 저장된 값 유지)."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        return max(0, min(int(str(value).strip()), 60))
+    except (TypeError, ValueError):
+        return None
+
+
 def validate_resume_content(
     source_type: str,
     *,
@@ -27,6 +38,8 @@ def validate_resume_content(
     projects: str = "",
     education: str = "",
     skills_text: str = "",
+    total_years: str = "",
+    target_position: str = "",
 ) -> dict[str, str]:
     """Field errors for a written résumé, keyed by field name.
 
@@ -61,11 +74,15 @@ def apply_resume_content(
     projects: str = "",
     education: str = "",
     skills_text: str = "",
+    total_years: str = "",
+    target_position: str = "",
 ) -> None:
     """Write edited content onto `resume` and re-extract its skills. Caller commits.
 
     File-source résumés edit `raw_text` directly; form-source résumés recompose
-    it from the structured fields.
+    it from the structured fields. `total_years` / `target_position` apply to
+    both sources (career-axis matching); a blank `total_years` keeps the stored
+    value so a form that omits the field can't wipe it.
     """
     if resume.source_type == "file":
         resume.raw_text = raw_text
@@ -73,6 +90,11 @@ def apply_resume_content(
         resume.raw_text = compose_form_raw_text(career, projects, education, skills_text)
         resume.structured = _form_structured(career, projects, education, skills_text)
     resume.extracted_skills = extract_skill_names(resume.raw_text)
+    years = _coerce_years(total_years)
+    if years is not None:
+        resume.total_years = years
+    if target_position is not None:
+        resume.target_position = (target_position or "").strip()
 
 
 def new_resume(
@@ -84,6 +106,8 @@ def new_resume(
     projects: str = "",
     education: str = "",
     skills_text: str = "",
+    total_years: str = "",
+    target_position: str = "",
     structured: dict | None = None,
 ) -> Resume:
     """Build a new Resume, routing content through apply_resume_content().
@@ -99,5 +123,7 @@ def new_resume(
         projects=projects,
         education=education,
         skills_text=skills_text,
+        total_years=total_years,
+        target_position=target_position,
     )
     return resume

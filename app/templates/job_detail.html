@@ -3,6 +3,7 @@
 {% block content %}
 {% from "_pick_target.html" import pick_target %}
 {% from "_forms.html" import delete_form %}
+{% from "_timeline.html" import timeline %}
 <a href="/jobs" class="back-link">&larr; 목록으로</a>
 <h1>{{ job.title }} {% if job.status %}<span class="tag tag-status">{{ enum_label("job_status", job.status) }}</span>{% endif %}</h1>
 <p class="meta">{{ job.company }} · {{ enum_label("position", job.position) }} {% if job.experience_level %}· {{ enum_label("experience_level", job.experience_level) }}{% endif %}
@@ -10,6 +11,14 @@
   {% if job.source_site %} · <span class="tag tag-source">{{ job.source_site }}</span>{% endif %}
   {% if job.url %} · <a href="{{ job.url }}" target="_blank" rel="noopener">원본 공고 보기</a>{% endif %}
 </p>
+{% if job.employment_type or job.remote_policy or job.deadline or job.salary_text %}
+<p class="meta">
+  {% if job.employment_type %}<span class="tag tag-source">{{ enum_label("employment_type", job.employment_type) }}</span>{% endif %}
+  {% if job.remote_policy %}<span class="tag tag-source">{{ enum_label("remote_policy", job.remote_policy) }}</span>{% endif %}
+  {% if job.deadline %}<span class="tag tag-required">마감 {{ job.deadline }}</span>{% endif %}
+  {% if job.salary_text %} · {{ job.salary_text }}{% endif %}
+</p>
+{% endif %}
 
 <form method="post" action="/jobs/{{ job.id }}/application" class="card">
   <h3>지원 기록</h3>
@@ -46,6 +55,20 @@
   <button type="submit" class="btn-secondary">저장</button>
 </form>
 
+<div class="card">
+  <h3>지원 이력</h3>
+  {{ timeline(timeline_entries) }}
+  <form method="post" action="/jobs/{{ job.id }}/interview" class="filter-bar" style="margin-top:12px;">
+    <label>면접 일정 추가
+      <input type="date" name="event_at" required>
+    </label>
+    <label>메모 (차수·형식 등)
+      <input type="text" name="detail" placeholder="예: 1차 기술 면접 (화상)">
+    </label>
+    <button type="submit" class="btn-secondary">면접 일정 추가</button>
+  </form>
+</div>
+
 {% if resumes %}
 <div class="card filter-bar">
   {{ pick_target("/analysis/coach", "job_id", job.id, "resume_id", "이 이력서로 " ~ FEATURE_COACH_SHORT, resumes, SELECT_RESUME_PLACEHOLDER, "label") }}
@@ -76,6 +99,20 @@
   </div>
   {% if job.preferred_text %}<div class="section-text">{{ job.preferred_text|bulleted }}</div>{% endif %}
 </div>
+
+{% if job.process_text %}
+<div class="card">
+  <h3>채용 전형</h3>
+  <div class="section-text">{{ job.process_text|bulleted }}</div>
+</div>
+{% endif %}
+
+{% if job.benefits_text %}
+<div class="card">
+  <h3>복지 · 혜택</h3>
+  <div class="section-text">{{ job.benefits_text|bulleted }}</div>
+</div>
+{% endif %}
 
 <details class="card" {% if not sections_detected %}open{% endif %}>
   <summary><strong>원문{% if not sections_detected %} (자동 인식 실패 — 여기서 확인하세요){% endif %}</strong></summary>

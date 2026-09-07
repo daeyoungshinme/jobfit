@@ -99,6 +99,12 @@ def _guess_years(text: str) -> int | None:
     return max(values) if values else None
 
 
+def guess_total_years(text: str) -> int | None:
+    """이력서 원문에서 총 경력 연차를 추측한다 (없으면 None). 공개 래퍼 —
+    Resume.total_years 백필에서 재사용한다."""
+    return _guess_years(text)
+
+
 def _first_nonempty_line(text: str) -> str:
     for line in (text or "").splitlines():
         stripped = line.strip(" \t-•·*—")

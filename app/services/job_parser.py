@@ -18,17 +18,19 @@ _PREFERRED_HEADERS = [
     r"preferred\s*(?:qualifications?|skills?|experience)?",
     r"nice\s*to\s*have",
 ]
-# Headers that mark a section we deliberately don't track (application process,
-# work conditions, benefits, submission docs, ...). Recognizing them lets us
-# close whatever tracked section was open instead of letting that boilerplate
-# leak into e.g. preferred_text, the way it otherwise would with no boundary.
-# Benefits ("복리후생", "혜택 및 복지", 바로 뒤 "복지"/"혜택"/"근무환경") carry no
-# signal for job-fit analysis so they aren't stored as a section, but they still
-# need to end the preceding 우대/자격 section — hence they live here.
+# 복지/전형 헤더는 이제 내용을 버리지 않고 별도 섹션으로 저장한다 (job-fit 분석엔
+# 안 쓰지만 상세 페이지 표시·비교용). 여전히 앞선 우대/자격 섹션의 경계로도 작동한다.
+_BENEFITS_HEADERS = [
+    r"복리\s*후생", r"혜택\s*(?:및|/)?\s*복지", r"복지\s*(?:및|/)?\s*혜택",
+    r"복지", r"혜택", r"근무\s*환경", r"benefits?", r"perks?",
+]
+_PROCESS_HEADERS = [
+    r"채용\s*전형", r"전형\s*절차", r"채용\s*절차", r"모집\s*절차", r"채용\s*프로세스",
+    r"전형\s*방법", r"지원\s*절차",
+]
+# 여전히 내용을 버리는 순수 stop 헤더 (근무조건/제출서류/지원방법 등).
 _STOP_HEADERS = [
-    r"근무\s*조건", r"채용\s*전형", r"전형\s*절차", r"채용\s*절차", r"모집\s*절차",
-    r"제출\s*서류", r"지원\s*방법", r"접수\s*방법", r"지원\s*절차",
-    r"복리\s*후생", r"혜택\s*(?:및|/)?\s*복지", r"복지\s*(?:및|/)?\s*혜택", r"복지", r"혜택", r"근무\s*환경",
+    r"근무\s*조건", r"제출\s*서류", r"지원\s*방법", r"접수\s*방법",
 ]
 
 _HEADER_PATTERN = re.compile(
@@ -36,11 +38,13 @@ _HEADER_PATTERN = re.compile(
     "|(?P<tech_stack>" + "|".join(_TECH_STACK_HEADERS) + ")"
     "|(?P<required>" + "|".join(_REQUIRED_HEADERS) + ")"
     "|(?P<preferred>" + "|".join(_PREFERRED_HEADERS) + ")"
+    "|(?P<benefits>" + "|".join(_BENEFITS_HEADERS) + ")"
+    "|(?P<process>" + "|".join(_PROCESS_HEADERS) + ")"
     "|(?P<stop>" + "|".join(_STOP_HEADERS) + ")",
     re.IGNORECASE,
 )
 
-_SECTION_LABELS = ("main_tasks", "tech_stack", "required", "preferred")
+_SECTION_LABELS = ("main_tasks", "tech_stack", "required", "preferred", "benefits", "process")
 
 # Characters that only ever decorate a header line ("[자격요건]", "■ 우대사항",
 # "혜택 및 복지 :") — stripped from both ends before checking whether the line
@@ -150,6 +154,8 @@ class ParsedJobPosting:
     required_text: str
     preferred_text: str
     sections_detected: bool
+    benefits_text: str = ""
+    process_text: str = ""
 
 
 @dataclass
@@ -165,6 +171,10 @@ class GuessedFields:
     position: str
     experience_level: str
     address: str
+    employment_type: str = ""
+    remote_policy: str = ""
+    deadline: str = ""
+    salary_text: str = ""
 
 
 def _find_header_lines(lines: list[str]) -> list[tuple[int, str, str]]:
@@ -255,6 +265,8 @@ def apply_parsed_sections(job, parsed: ParsedJobPosting) -> None:
     job.required_skills = parsed.required_skills
     job.preferred_skills = parsed.preferred_skills
     job.sections_detected = parsed.sections_detected
+    job.benefits_text = parsed.benefits_text
+    job.process_text = parsed.process_text
 
 
 def parse_job_posting(raw_text: str) -> ParsedJobPosting:
@@ -274,6 +286,8 @@ def parse_job_posting(raw_text: str) -> ParsedJobPosting:
         required_text=required_text.strip(),
         preferred_text=preferred_text.strip(),
         sections_detected=sections_detected,
+        benefits_text=sections["benefits"].strip(),
+        process_text=sections["process"].strip(),
     )
 
 
@@ -318,6 +332,12 @@ def _guess_position(title: str, raw_text: str) -> str:
     return ""
 
 
+def guess_position_code(title: str, raw_text: str = "") -> str:
+    """제목·본문에서 POSITION 코드를 추측한다 (없으면 ""). 공개 래퍼 —
+    이력서 target_position 백필 등 파서 밖에서도 재사용한다."""
+    return _guess_position(title, raw_text)
+
+
 def _experience_code_for_range(lo: int, hi: int) -> str:
     """(lo, hi) 가 표준 버킷의 경계와 정확히 일치하면 그 코드를, 아니면 "lo~hi년"
     자유 문자열을 돌려준다 (사용자가 공고에 적힌 정확한 수치를 보도록)."""
@@ -348,6 +368,58 @@ def _guess_address(raw_text: str) -> str:
         return label_match.group("value").strip()[:300]
     pattern_match = _ADDRESS_PATTERN.search(raw_text)
     return pattern_match.group(0).strip()[:300] if pattern_match else ""
+
+
+# 고용형태 — 더 구체적인 것부터. 아무것도 안 걸리면 "" (정규직 단정은 하지 않음).
+_EMPLOYMENT_TERMS: list[tuple[str, tuple[str, ...]]] = [
+    ("contract", ("계약직",)),
+    ("intern", ("인턴", "인턴십", "체험형 인턴", "채용전환형")),
+    ("dispatch", ("파견직", "파견")),
+    ("freelance", ("프리랜서", "프리랜스", "외주")),
+    ("fulltime", ("정규직",)),
+]
+
+_HYBRID_PATTERN = re.compile(r"하이브리드|주\s*\d\s*(?:일|회)\s*(?:재택|출근)|부분\s*재택|재택\s*병행")
+_REMOTE_PATTERN = re.compile(r"(?:완전\s*|풀\s*)?재택(?:\s*근무)?|리모트|remote|원격\s*근무", re.IGNORECASE)
+
+_DEADLINE_DATE_PATTERN = re.compile(
+    r"(?:마감|접수\s*마감|모집\s*마감|~|까지|채용\s*종료)[^\n0-9]{0,8}(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})"
+)
+_ALWAYS_HIRING_PATTERN = re.compile(r"상시\s*채용|수시\s*채용|채용\s*시\s*(?:마감|까지)|충원\s*시\s*마감")
+_SALARY_PATTERN = re.compile(
+    r"(?:연봉|급여|연 소득|처우)[^\n]{0,40}?\d[\d,]*\s*(?:만원|만\s*원|억|천만원)[^\n]{0,15}"
+)
+
+
+def _guess_employment_type(raw_text: str) -> str:
+    for code, terms in _EMPLOYMENT_TERMS:
+        if any(term_pattern(term).search(raw_text) for term in terms):
+            return code
+    return ""
+
+
+def _guess_remote_policy(raw_text: str) -> str:
+    if _HYBRID_PATTERN.search(raw_text):
+        return "hybrid"
+    if _REMOTE_PATTERN.search(raw_text):
+        return "remote"
+    return ""
+
+
+def _guess_deadline(raw_text: str) -> str:
+    if _ALWAYS_HIRING_PATTERN.search(raw_text):
+        return "상시"
+    match = _DEADLINE_DATE_PATTERN.search(raw_text)
+    if match:
+        year, month, day = (int(g) for g in match.groups())
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+    return ""
+
+
+def _guess_salary(raw_text: str) -> str:
+    match = _SALARY_PATTERN.search(raw_text)
+    return match.group(0).strip()[:200] if match else ""
 
 
 _SOURCE_SITE_DOMAINS: list[tuple[str, str]] = [
@@ -406,4 +478,8 @@ def guess_posting_fields(raw_text: str) -> GuessedFields:
         position=position,
         experience_level=experience_level,
         address=address,
+        employment_type=_guess_employment_type(raw_text),
+        remote_policy=_guess_remote_policy(raw_text),
+        deadline=_guess_deadline(raw_text),
+        salary_text=_guess_salary(raw_text),
     )

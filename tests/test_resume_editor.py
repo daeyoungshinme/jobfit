@@ -61,6 +61,31 @@ def test_new_resume_form_source_builds_structured_and_skills():
     assert "FastAPI" in resume.extracted_skills
 
 
+def test_apply_resume_content_sets_career_meta_on_both_sources():
+    form = Resume(label="r", source_type="form", raw_text="old", structured={})
+    apply_resume_content(form, career="Python 3년", total_years="5", target_position="backend")
+    assert form.total_years == 5
+    assert form.target_position == "backend"
+
+    filed = Resume(label="r", source_type="file", raw_text="x", structured={}, total_years=0)
+    apply_resume_content(filed, raw_text="Kotlin", total_years="8")
+    assert filed.total_years == 8
+
+
+def test_apply_resume_content_blank_total_years_keeps_stored_value():
+    resume = Resume(label="r", source_type="form", raw_text="old", structured={}, total_years=7)
+    apply_resume_content(resume, career="Python", total_years="")
+    assert resume.total_years == 7  # 빈칸은 '변경 없음'
+
+
+def test_apply_resume_content_clamps_out_of_range_years():
+    resume = Resume(label="r", source_type="form", raw_text="old", structured={}, total_years=3)
+    apply_resume_content(resume, career="Python", total_years="999")
+    assert resume.total_years == 60
+    apply_resume_content(resume, career="Python", total_years="abc")
+    assert resume.total_years == 60  # 파싱 실패도 '변경 없음'
+
+
 def test_new_resume_file_source_keeps_supplied_structured():
     resume = new_resume(
         label="파일 이력서",

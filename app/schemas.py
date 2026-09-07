@@ -14,6 +14,14 @@ class MatchResult(BaseModel):
     missing_required: list[str]
     matched_preferred: list[str]
     missing_preferred: list[str]
+    # missing_* 중 대체/인접 스킬로 커버되는 부분집합 (예: React 요구 + Vue 보유)
+    related_required: list[str] = []
+    related_preferred: list[str] = []
+    # 경력 적합도 축 (이력서 total_years vs 공고 experience_level). None = 해당 없음
+    # (공고 경력 조건이 '무관'이거나 해석 불가). experience_weight 가 0 이면 점수엔
+    # 반영되지 않고 투명 노출용으로만 채워진다.
+    experience_fit: float | None = None
+    experience_detail: str = ""
 
 
 class SkillRank(BaseModel):

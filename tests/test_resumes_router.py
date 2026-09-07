@@ -69,6 +69,43 @@ def test_submit_resume_form_success_redirects_to_detail(client, db_session):
     assert "Python" in resume.extracted_skills
 
 
+def test_submit_resume_form_persists_career_meta(client, db_session):
+    response = client.post(
+        "/resumes/form",
+        data={
+            "label": "경력 이력서",
+            "career": "5년차 백엔드",
+            "skills_text": "Python",
+            "total_years": "5",
+            "target_position": "backend",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    resume = db_session.query(Resume).one()
+    assert resume.total_years == 5
+    assert resume.target_position == "backend"
+
+
+def test_update_resume_edits_career_meta(client, db_session, resume_factory):
+    resume = resume_factory(label="원래", total_years=2)
+    response = client.post(
+        f"/resumes/{resume.id}/edit",
+        data={
+            "label": "원래",
+            "career": "Python 백엔드",
+            "skills_text": "Python",
+            "total_years": "8",
+            "target_position": "data_eng",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    db_session.refresh(resume)
+    assert resume.total_years == 8
+    assert resume.target_position == "data_eng"
+
+
 def test_list_resumes_returns_200(client, resume_factory):
     resume_factory(raw_text="Python 백엔드 개발")
 

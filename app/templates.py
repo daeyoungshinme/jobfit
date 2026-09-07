@@ -20,11 +20,13 @@ from app.constants import (
 )
 from app.enums import (
     APPLY_CHANNEL,
+    EMPLOYMENT_TYPE,
     EXPERIENCE_LEVEL,
     JOB_STATUS,
     JOB_STATUS_DEFAULT,
     POSITION,
     REGION,
+    REMOTE_POLICY,
     enum_label,
 )
 from app.services.text_formatter import render_bulleted_html
@@ -55,6 +57,8 @@ templates.env.globals.update(
     EXPERIENCE_LEVEL_CODES=EXPERIENCE_LEVEL.codes(),
     APPLY_CHANNEL_CHOICES=APPLY_CHANNEL.choices(),
     REGION_CHOICES=REGION.choices(),
+    EMPLOYMENT_TYPE_CHOICES=EMPLOYMENT_TYPE.choices(),
+    REMOTE_POLICY_CHOICES=REMOTE_POLICY.choices(),
     EMPTY_SKILLS=EMPTY_SKILLS,
     EMPTY_REQUIRED_SKILLS=EMPTY_REQUIRED_SKILLS,
     EMPTY_PREFERRED_SKILLS=EMPTY_PREFERRED_SKILLS,

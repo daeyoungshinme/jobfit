@@ -2,10 +2,11 @@
    (pick a résumé → coach/tailor) and resume_detail (pick a job → coach/tailor).
    `data-autosubmit` submits on change; the button stays for no-JS use. #}
 {% macro pick_target(action, hidden_name, hidden_value, select_name, label, items, placeholder, text_attr, sub_attr=None) %}
+{% set fid = "pt-" ~ action|replace("/analysis/", "")|replace("/", "-") ~ "-" ~ select_name %}
 <form method="get" action="{{ action }}">
   <input type="hidden" name="{{ hidden_name }}" value="{{ hidden_value }}">
-  <label>{{ label }}
-    <select name="{{ select_name }}" data-autosubmit>
+  <label for="{{ fid }}">{{ label }}
+    <select name="{{ select_name }}" id="{{ fid }}" data-autosubmit>
       <option value="0">{{ placeholder }}</option>
       {% for it in items %}
       <option value="{{ it.id }}">{{ it[text_attr] }}{% if sub_attr %} ({{ it[sub_attr] }}){% endif %}</option>

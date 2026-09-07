@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initRawTextCounter();
   initGapChips();
   initCopyButtons();
+  initFormErrors();
 });
 
 // --- shared helpers -------------------------------------------------------
@@ -46,16 +47,39 @@ function fadeOutAndRemove(el, delay) {
   }, delay);
 }
 
-// Transient client-side error banner (server-rendered flashes use the same
-// .toast markup from base.html).
-function showError(text) {
+// Transient client-side toast. Lands in #toast-region (a persistent aria-live
+// region in base.html) so screen readers announce it; falls back to prepending
+// into #main-content on the off chance the region is missing.
+function showToast(text, kind) {
   const el = document.createElement("div");
-  el.className = "toast toast-error";
-  el.setAttribute("role", "alert");
+  el.className = "toast toast-" + (kind || "success");
+  el.setAttribute("role", kind === "error" ? "alert" : "status");
   el.textContent = text;
-  const main = document.getElementById("main-content") || document.body;
-  main.prepend(el);
-  fadeOutAndRemove(el, 4000);
+  const region = document.getElementById("toast-region");
+  (region || document.getElementById("main-content") || document.body).prepend(el);
+  fadeOutAndRemove(el, kind === "error" ? 4000 : 2500);
+}
+
+function showError(text) {
+  showToast(text, "error");
+}
+
+// Put a button into a loading state: disabled, aria-busy, spinner + label swap.
+// Returns a function that restores it.
+function setButtonBusy(btn, busyLabel) {
+  if (!btn) return () => {};
+  const prevHTML = btn.innerHTML;
+  const wasDisabled = btn.disabled;
+  btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
+  btn.innerHTML =
+    '<span class="spinner" aria-hidden="true"></span>' +
+    (busyLabel != null ? busyLabel : btn.textContent);
+  return () => {
+    btn.innerHTML = prevHTML;
+    btn.disabled = wasDisabled;
+    btn.removeAttribute("aria-busy");
+  };
 }
 
 async function postForm(url, params) {
@@ -135,7 +159,13 @@ function initTabs() {
 // paired submit button (kept in the markup for no-JS use) isn't needed.
 function initAutoSubmit() {
   document.querySelectorAll("[data-autosubmit]").forEach((el) => {
-    el.addEventListener("change", () => el.form && el.form.submit());
+    el.addEventListener("change", () => {
+      if (!el.form) return;
+      // The change triggers a full-page GET; show a top progress bar so the
+      // wait isn't a dead moment.
+      document.body.classList.add("is-navigating");
+      el.form.submit();
+    });
   });
 }
 
@@ -156,10 +186,13 @@ function initSourceSiteGuess() {
   sourceSiteEl.addEventListener("input", () => { sourceSiteTouched = true; });
   sourceSiteEl.addEventListener("change", () => { sourceSiteTouched = true; });
 
+  const statusEl = document.getElementById("source-site-status");
   const guessSource = async () => {
     if (sourceSiteTouched || !urlEl.value.trim()) return;
+    if (statusEl) statusEl.textContent = "감지 중...";
     try {
       const data = await postForm("/jobs/guess-source", { url: urlEl.value });
+      if (statusEl) statusEl.textContent = "";
       if (!data.source_site) return;
       sourceSiteEl.value = data.source_site;
       sourceSiteEl.classList.add("field-flash");
@@ -167,6 +200,7 @@ function initSourceSiteGuess() {
     } catch (e) {
       // A failed source guess is a convenience miss, not worth interrupting the
       // user — they can still type the site in by hand.
+      if (statusEl) statusEl.textContent = "";
     }
   };
 
@@ -193,13 +227,10 @@ function initSkillPreview() {
     el.addEventListener("change", () => touched.add(id));
   });
 
-  const previewBtnDefaultText = previewBtn.textContent;
-
   const runPreview = async () => {
     const rawText = rawTextEl.value;
     if (!rawText.trim() || previewBtn.disabled) return;
-    previewBtn.disabled = true;
-    previewBtn.textContent = MSG.analyzing;
+    const restore = setButtonBusy(previewBtn, MSG.analyzing);
     try {
       const data = await postForm("/jobs/preview", { raw_text: rawText });
       const required = data.required_skills || [];
@@ -208,8 +239,9 @@ function initSkillPreview() {
         required.length ? required.join(", ") : MSG.noRequiredSkills;
       document.getElementById("preview-preferred").textContent =
         preferred.length ? preferred.join(", ") : MSG.noPreferredSkills;
-      document.getElementById("preview-result").style.display = "block";
+      document.getElementById("preview-result").hidden = false;
 
+      const filled = [];
       autoFillIds.forEach((id) => {
         if (touched.has(id)) return;
         const value = data[id];
@@ -222,12 +254,15 @@ function initSkillPreview() {
           el.add(new Option(value, value, true, true));
         }
         el.value = value;
+        el.classList.add("field-flash");
+        setTimeout(() => el.classList.remove("field-flash"), 900);
+        filled.push(id);
       });
+      if (filled.length) showToast(`원문에서 ${filled.length}개 항목을 채웠습니다 — 저장 전에 확인하세요.`);
     } catch (e) {
       showError(e.message || MSG.requestFailed);
     } finally {
-      previewBtn.disabled = false;
-      previewBtn.textContent = previewBtnDefaultText;
+      restore();
     }
   };
 
@@ -271,7 +306,7 @@ async function runOcrFiles(files) {
   const ocrStatusEl = document.getElementById("ocr-status");
   const ocrBtn = document.getElementById("ocr-btn");
   if (!files.length || !rawTextEl || !ocrStatusEl) return;
-  if (ocrBtn) ocrBtn.disabled = true;
+  const restoreOcrBtn = setButtonBusy(ocrBtn, MSG.ocrOne);
 
   const extractedTexts = [];
   const failed = [];
@@ -301,12 +336,13 @@ async function runOcrFiles(files) {
       ocrStatusEl.textContent =
         `${files.length}개 중 ${extractedTexts.length}개 완료 (실패: ${failed.join(", ")})`;
     } else {
-      ocrStatusEl.textContent = `텍스트 추출에 실패했습니다 (${failed.join(", ")})`;
+      ocrStatusEl.textContent = "";
+      showError(`텍스트 추출에 실패했습니다 (${failed.join(", ")})`);
     }
 
     if (extractedTexts.length && window.__jobfitRunPreview) window.__jobfitRunPreview();
   } finally {
-    if (ocrBtn) ocrBtn.disabled = false;
+    restoreOcrBtn();
   }
 }
 
@@ -354,8 +390,10 @@ function initCopyButtons() {
           sel.removeAllRanges();
         }
         btn.textContent = "복사됨 ✓";
+        showToast("클립보드에 복사했습니다.");
       } catch (e) {
         btn.textContent = "복사 실패";
+        showError("복사하지 못했습니다. 텍스트를 직접 선택해 복사해 주세요.");
       }
       setTimeout(() => { btn.textContent = defaultText; }, 1500);
     });
@@ -370,11 +408,28 @@ function initGapChips() {
     chip.addEventListener("click", () => {
       const input = document.querySelector('input[name="skills_text"]');
       if (!input) return;
-      const skill = chip.textContent.replace(/^\+\s*/, "").trim();
+      // Strip the "+ " or "≈ " prefix the chip renders.
+      const skill = chip.textContent.replace(/^[+≈]\s*/, "").trim();
       const current = input.value.split(",").map((s) => s.trim()).filter(Boolean);
       if (!current.includes(skill)) current.push(skill);
       input.value = current.join(", ");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
       input.focus();
     });
+  });
+}
+
+// After a failed form POST the server re-renders with .field-error marks; pull
+// focus to the first one so the user isn't left staring at an unchanged page.
+function initFormErrors() {
+  const first = document.querySelector(".field-error, [aria-invalid='true']");
+  if (!first) return;
+  const target = first.matches("input, select, textarea")
+    ? first
+    : first.querySelector("input, select, textarea") || first;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({
+    block: "center",
+    behavior: REDUCED_MOTION.matches ? "auto" : "smooth",
   });
 }

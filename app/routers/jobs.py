@@ -131,9 +131,12 @@ class JobForm:
 def _persist_job(job: JobPosting, form: JobForm) -> None:
     """Write validated form fields + re-parsed sections onto `job`. Caller commits."""
     raw_text = normalize_newlines(form.raw_text)
+    # 폼 값이 있으면 그대로, 없으면 원문에서 추측 (source_site 와 같은 패턴 —
+    # no-JS 사용자도 최소한의 자동 채움을 받도록).
+    guessed = guess_posting_fields(raw_text)
     job.title = form.title
-    job.company = form.company
-    job.address = form.address
+    job.company = form.company or guessed.company
+    job.address = form.address or guessed.address
     job.url = form.url
     job.source_site = form.source_site.strip() or guess_source_site(form.url)
     job.position = form.position
@@ -142,9 +145,6 @@ def _persist_job(job: JobPosting, form: JobForm) -> None:
     job.is_inbound = form.is_inbound
     job.raw_text = raw_text
     apply_parsed_sections(job, parse_job_posting(raw_text))
-    # 폼 값이 있으면 그대로, 없으면 원문에서 추측 (source_site 와 같은 패턴 —
-    # no-JS 사용자도 최소한의 자동 채움을 받도록).
-    guessed = guess_posting_fields(raw_text)
     job.employment_type = form.employment_type or guessed.employment_type
     job.remote_policy = form.remote_policy or guessed.remote_policy
     job.salary_text = form.salary_text or guessed.salary_text

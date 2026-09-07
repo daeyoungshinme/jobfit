@@ -18,8 +18,8 @@
 <div id="file-tab" class="tab-panel {{ 'active' if active_tab == 'file-tab' }}" role="tabpanel" aria-labelledby="file-tab-btn">
   <form method="post" action="/resumes/upload" enctype="multipart/form-data" class="card form-card">
     {{ text_field("label", "이력서 이름", values.label, errors.label, required=True, placeholder="예: 2026년 8월 버전", id="file-label") }}
-    <label>파일 (PDF, DOCX, TXT)
-      <input type="file" name="file" accept=".pdf,.docx,.txt" required class="{{ 'field-error' if errors.file }}" {% if errors.file %}aria-invalid="true" aria-describedby="file-error"{% endif %}>
+    <label for="file">파일 (PDF, DOCX, TXT)
+      <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" required class="{{ 'field-error' if errors.file }}" {% if errors.file %}aria-invalid="true" aria-describedby="file-error"{% endif %}>
       {% if errors.file %}<span class="field-error-text" id="file-error">{{ errors.file }}</span>{% endif %}
     </label>
     <p class="hint">파일에서 총 경력·목표 직무를 자동으로 추측합니다. 업로드 후 이력서 수정에서 바로잡을 수 있습니다.</p>

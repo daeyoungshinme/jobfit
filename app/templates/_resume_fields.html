@@ -2,17 +2,17 @@
 {% set v = values or {} %}
 <div class="card form-card">
   <h3>상세 내용</h3>
-  <label>경력/경험
-    <textarea name="career" rows="5" placeholder="회사, 기간, 담당 업무와 성과를 적어주세요">{{ v.career or '' }}</textarea>
+  <label for="rf-career">경력/경험
+    <textarea name="career" id="rf-career" rows="5" placeholder="회사, 기간, 담당 업무와 성과를 적어주세요">{{ v.career or '' }}</textarea>
   </label>
-  <label>프로젝트
-    <textarea name="projects" rows="5" placeholder="프로젝트명, 역할, 사용 기술, 성과를 적어주세요">{{ v.projects or '' }}</textarea>
+  <label for="rf-projects">프로젝트
+    <textarea name="projects" id="rf-projects" rows="5" placeholder="프로젝트명, 역할, 사용 기술, 성과를 적어주세요">{{ v.projects or '' }}</textarea>
   </label>
-  <label>학력
-    <textarea name="education" rows="3" placeholder="학교, 전공, 졸업연도">{{ v.education or '' }}</textarea>
+  <label for="rf-education">학력
+    <textarea name="education" id="rf-education" rows="3" placeholder="학교, 전공, 졸업연도">{{ v.education or '' }}</textarea>
   </label>
-  <label>보유 기술 스킬 (쉼표로 구분)
-    <input type="text" name="skills_text" placeholder="예: Python, FastAPI, PostgreSQL, Docker" value="{{ v.skills_text or '' }}">
+  <label for="rf-skills">보유 기술 스킬 (쉼표로 구분)
+    <input type="text" name="skills_text" id="rf-skills" placeholder="예: Python, FastAPI, PostgreSQL, Docker" value="{{ v.skills_text or '' }}">
   </label>
 </div>
 {% endmacro %}
@@ -20,11 +20,11 @@
 {% macro career_meta_fields(total_years='', target_position='') %}
 <div class="card form-card">
   <h3>경력 정보 <span class="hint-inline">(매칭 점수의 경력 적합도 축에 사용)</span></h3>
-  <label>총 경력 (년)
-    <input type="number" name="total_years" min="0" max="60" step="1" value="{{ total_years or '' }}" placeholder="예: 3">
+  <label for="cm-total-years">총 경력 (년)
+    <input type="number" name="total_years" id="cm-total-years" min="0" max="60" step="1" value="{{ total_years or '' }}" placeholder="예: 3">
   </label>
-  <label>목표 직무
-    <select name="target_position">
+  <label for="cm-target-position">목표 직무
+    <select name="target_position" id="cm-target-position">
       <option value="">{{ SELECT_PLACEHOLDER }}</option>
       {% for code, label in POSITION_CHOICES %}
       <option value="{{ code }}" {% if target_position == code %}selected{% endif %}>{{ label }}</option>

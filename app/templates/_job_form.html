@@ -15,9 +15,9 @@
   <div class="card form-card">
     <h3>기본 정보</h3>
     {{ text_field("title", "공고 제목", v.title, errors.title, required=True, placeholder="예: 백엔드 개발자 (5년 이상)") }}
-    {{ text_field("company", "회사명", v.company, placeholder="예: JobFit테크") }}
+    {{ text_field("company", "회사명", v.company, errors.company, placeholder="예: JobFit테크") }}
     <div class="row">
-      <label>직무
+      <label for="position">직무 <span class="req" aria-hidden="true">*</span>
         <select name="position" id="position" required class="{{ 'field-error' if errors.position }}"
           {% if errors.position %}aria-invalid="true" aria-describedby="position-error"{% endif %}>
           <option value="" {% if not v.position %}selected{% endif %} disabled>{{ SELECT_PLACEHOLDER }}</option>
@@ -27,7 +27,7 @@
         </select>
         {% if errors.position %}<span class="field-error-text" id="position-error">{{ errors.position }}</span>{% endif %}
       </label>
-      <label>경력 조건
+      <label for="experience_level">경력 조건
         <select name="experience_level" id="experience_level">
           <option value="" {% if not v.experience_level %}selected{% endif %}>무관/선택 안 함</option>
           {% for code, label in EXPERIENCE_LEVEL_CHOICES %}
@@ -38,7 +38,7 @@
           {% endif %}
         </select>
       </label>
-      <label>지원 상태
+      <label for="status">지원 상태
         <select name="status" id="status">
           {% for code, label in JOB_STATUS_CHOICES %}
           <option value="{{ code }}" {% if (v.status or JOB_STATUS_DEFAULT) == code %}selected{% endif %}>{{ label }}</option>
@@ -55,14 +55,14 @@
     <details class="filter-group" {% if v.address or v.url or v.source_site or v.employment_type or v.remote_policy or v.deadline or v.salary_text %}open{% endif %}>
       <summary>추가 정보 (선택 · 원문에서 일부 자동 감지)</summary>
       {{ text_field("address", "회사 주소", v.address, placeholder="예: 서울특별시 강남구 테헤란로 123") }}
-      <label>공고 URL
+      <label for="url">공고 URL
         <input type="url" name="url" id="url" placeholder="https://..." value="{{ v.url or '' }}">
       </label>
-      <label>공고 플랫폼 <span class="hint-inline">(URL 입력 시 자동 감지, 필요하면 직접 수정)</span>
+      <label for="source_site">공고 플랫폼 <span class="hint-inline">(URL 입력 시 자동 감지, 필요하면 직접 수정)</span> <span id="source-site-status" class="hint-inline" aria-live="polite"></span>
         <input type="text" name="source_site" id="source_site" placeholder="예: 사람인, 잡코리아, 원티드" value="{{ v.source_site or '' }}">
       </label>
       <div class="row">
-        <label>고용형태
+        <label for="employment_type">고용형태
           <select name="employment_type" id="employment_type">
             <option value="">선택 안 함</option>
             {% for code, label in EMPLOYMENT_TYPE_CHOICES %}
@@ -70,7 +70,7 @@
             {% endfor %}
           </select>
         </label>
-        <label>근무 형태
+        <label for="remote_policy">근무 형태
           <select name="remote_policy" id="remote_policy">
             <option value="">선택 안 함</option>
             {% for code, label in REMOTE_POLICY_CHOICES %}
@@ -80,10 +80,10 @@
         </label>
       </div>
       <div class="row">
-        <label>마감일 <span class="hint-inline">(YYYY-MM-DD 또는 "상시")</span>
+        <label for="deadline">마감일 <span class="hint-inline">(YYYY-MM-DD 또는 "상시")</span>
           <input type="text" name="deadline" id="deadline" placeholder="예: 2026-03-15" value="{{ v.deadline or '' }}">
         </label>
-        <label>연봉/급여
+        <label for="salary_text">연봉/급여
           <input type="text" name="salary_text" id="salary_text" placeholder="예: 연봉 5,000~7,000만원" value="{{ v.salary_text or '' }}">
         </label>
       </div>
@@ -92,26 +92,30 @@
 
   <div class="card form-card">
     <h3>공고 원문 및 스킬 분석</h3>
-    <label>공고 원문 <span id="raw-text-count" class="hint-inline" aria-live="polite"></span>
+    <label for="raw_text">공고 원문 <span class="req" aria-hidden="true">*</span> <span id="raw-text-count" class="hint-inline" aria-live="polite"></span>
       <textarea name="raw_text" id="raw_text" rows="14" required placeholder="채용공고 전문을 붙여넣으세요 (자격요건, 우대사항 포함)" class="{{ 'field-error' if errors.raw_text }}"
         {% if errors.raw_text %}aria-invalid="true" aria-describedby="raw_text-error"{% endif %}>{{ v.raw_text or '' }}</textarea>
       {% if errors.raw_text %}<span class="field-error-text" id="raw_text-error">{{ errors.raw_text }}</span>{% endif %}
     </label>
 
-    {% if mode == "new" %}
-    <p class="hint">사람인/잡코리아는 텍스트 선택이 막혀있을 수 있습니다. 복사가 안 되면 README의 "원문이 복사가 안 될 때" 항목의 북마클릿/유저스크립트를 참고하거나, 아래에서 캡처 이미지를 업로드/붙여넣어 텍스트를 추출하세요. 여러 장을 한 번에 선택하면 순서대로 이어붙여 추출합니다 (선택 순서가 뒤바뀔 수 있으니 파일명에 순번을 붙여두면 안전합니다).</p>
+    <div class="tool-panel">
+      <p class="tool-panel-title">붙여넣기 도우미</p>
+      {% if mode == "new" %}
+      <p class="hint">사람인/잡코리아는 텍스트 선택이 막혀있을 수 있습니다. 복사가 안 되면 README의 "원문이 복사가 안 될 때" 항목의 북마클릿/유저스크립트를 참고하거나, 캡처 이미지를 업로드/붙여넣어 텍스트를 추출하세요. 여러 장을 한 번에 선택하면 순서대로 이어붙입니다 (파일명에 순번을 붙여두면 안전합니다).</p>
 
-    <div class="ocr-controls">
-      <input type="file" id="ocr-file" accept="image/*" multiple>
-      <button type="button" id="ocr-btn" class="btn-secondary">이미지에서 텍스트 추출</button>
-      <span id="ocr-status" class="hint-inline" aria-live="polite"></span>
-    </div>
-    {% endif %}
+      <div class="ocr-controls">
+        <input type="file" id="ocr-file" accept="image/*" multiple aria-label="공고 캡처 이미지">
+        <button type="button" id="ocr-btn" class="btn-secondary">이미지에서 텍스트 추출</button>
+        <span id="ocr-status" class="hint-inline" aria-live="polite"></span>
+      </div>
+      {% endif %}
 
-    <button type="button" id="preview-btn" class="btn-secondary">스킬 미리보기</button>
-    <div id="preview-result" class="preview-box" style="display:none;" aria-live="polite">
-      <div><strong>필수 스킬</strong> <span id="preview-required"></span></div>
-      <div><strong>우대 스킬</strong> <span id="preview-preferred"></span></div>
+      <button type="button" id="preview-btn" class="btn-secondary">스킬 미리보기</button>
+      <div id="preview-result" class="preview-box" aria-live="polite" hidden>
+        <p class="hint">원문에서 인식한 스킬입니다. 저장 시 이 결과로 다시 계산됩니다.</p>
+        <div><strong>필수 스킬</strong> <span id="preview-required"></span></div>
+        <div><strong>우대 스킬</strong> <span id="preview-preferred"></span></div>
+      </div>
     </div>
 
     <div><button type="submit" class="btn-primary">{{ submit_label }}</button></div>

@@ -2,7 +2,18 @@
    in one place so every form associates its error text the same way. #}
 
 {% macro error_banner(errors) %}
-{% if errors %}<div class="form-error-banner" role="alert">입력값을 확인해주세요.</div>{% endif %}
+{% if errors %}
+<div class="form-error-banner" role="alert">
+  <strong>입력값을 확인해주세요.</strong>
+  {% if errors is mapping and errors.values()|select|list %}
+  <ul>
+    {% for field, message in errors.items() %}
+    {% if message %}<li><a href="#{{ field }}">{{ message }}</a></li>{% endif %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
 {% endmacro %}
 
 {% macro delete_form(action, confirm_text) %}
@@ -13,7 +24,7 @@
 
 {% macro text_field(name, label, value, error=None, required=False, placeholder="", id=None) %}
 {% set fid = id or name %}
-<label>{{ label }}
+<label for="{{ fid }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}
   <input type="text" name="{{ name }}" id="{{ fid }}"{% if required %} required{% endif %}
     {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
     value="{{ value or '' }}" class="{{ 'field-error' if error }}"
@@ -29,8 +40,8 @@
 <div class="card form-card">
   <h3>이력서 원문</h3>
   <p class="hint">파일 업로드로 등록된 이력서는 항목별 수정 대신 원문 텍스트를 직접 수정합니다. 저장 시 기술 스킬을 다시 인식합니다.</p>
-  <label>원문
-    <textarea name="raw_text" rows="{{ rows }}" required class="{{ 'field-error' if error }}"
+  <label for="raw_text">원문
+    <textarea name="raw_text" id="raw_text" rows="{{ rows }}" required class="{{ 'field-error' if error }}"
       {% if error %}aria-invalid="true" aria-describedby="raw_text-error"{% endif %}>{{ value or resume.raw_text }}</textarea>
     {% if error %}<span class="field-error-text" id="raw_text-error">{{ error }}</span>{% endif %}
   </label>

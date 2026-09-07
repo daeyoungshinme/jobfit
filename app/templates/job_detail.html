@@ -86,13 +86,13 @@
   <form method="post" action="/jobs/{{ job.id }}/application" class="card form-card">
     <h3>지원 기록</h3>
     <div class="row">
-      <label>지원 상태
-        <select name="status">
+      <label for="app-status">지원 상태
+        <select name="status" id="app-status">
           {% for code, label in JOB_STATUS_CHOICES %}<option value="{{ code }}" {% if job.status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </label>
-      <label>지원 채널
-        <select name="applied_via">
+      <label for="app-channel">지원 채널
+        <select name="applied_via" id="app-channel">
           <option value="">선택 안 함</option>
           {% for code, label in APPLY_CHANNEL_CHOICES %}
           <option value="{{ code }}" {% if job.applied_via == code or (not job.applied_via and suggested_channel == code) %}selected{% endif %}>{{ label }}</option>
@@ -101,18 +101,18 @@
       </label>
     </div>
     <div class="row">
-      <label>지원일
-        <input type="date" name="applied_at" value="{{ job.applied_at }}">
+      <label for="app-date">지원일
+        <input type="date" name="applied_at" id="app-date" value="{{ job.applied_at }}">
       </label>
-      <label>사용한 이력서
-        <select name="applied_resume_id">
+      <label for="app-resume">사용한 이력서
+        <select name="applied_resume_id" id="app-resume">
           <option value="0">선택 안 함</option>
           {% for r in resumes %}<option value="{{ r.id }}" {% if job.applied_resume_id == r.id %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
         </select>
       </label>
     </div>
-    <label>메모
-      <textarea name="memo" rows="3" placeholder="지원 경로 상세, 담당 리크루터, 마감일 등">{{ job.memo }}</textarea>
+    <label for="app-memo">메모
+      <textarea name="memo" id="app-memo" rows="3" placeholder="지원 경로 상세, 담당 리크루터, 마감일 등">{{ job.memo }}</textarea>
     </label>
     {% if job.applied_resume_id and not applied_resume %}
     <p class="hint">지원에 사용한 이력서(#{{ job.applied_resume_id }})가 삭제되었습니다.</p>
@@ -123,12 +123,12 @@
   <div class="card">
     <h3>지원 이력</h3>
     {{ timeline(timeline_entries) }}
-    <form method="post" action="/jobs/{{ job.id }}/interview" class="row row-spaced">
-      <label>면접 일정 추가
-        <input type="date" name="event_at" required>
+    <form method="post" action="/jobs/{{ job.id }}/interview" class="row row-spaced form-card">
+      <label for="iv-date">면접 일정 추가
+        <input type="date" name="event_at" id="iv-date" required>
       </label>
-      <label>메모 (차수·형식 등)
-        <input type="text" name="detail" placeholder="예: 1차 기술 면접 (화상)">
+      <label for="iv-detail">메모 (차수·형식 등)
+        <input type="text" name="detail" id="iv-detail" placeholder="예: 1차 기술 면접 (화상)">
       </label>
       <button type="submit" class="btn-secondary">추가</button>
     </form>

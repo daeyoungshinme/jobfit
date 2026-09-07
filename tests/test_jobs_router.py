@@ -23,6 +23,20 @@ def test_job_detail_200_when_exists(client, job_factory):
     assert "백엔드 개발자 채용" in response.text
 
 
+def test_job_detail_hint_uses_stored_sections_detected(client, db_session):
+    client.post("/jobs", data={"title": "구분된 공고", "position": "backend",
+                               "raw_text": "[자격요건]\nPython\n[우대사항]\nAWS"})
+    client.post("/jobs", data={"title": "줄글 공고", "position": "backend",
+                               "raw_text": "헤더 없이 줄글로만 작성된 공고"})
+    ok = db_session.query(JobPosting).filter_by(title="구분된 공고").one()
+    bad = db_session.query(JobPosting).filter_by(title="줄글 공고").one()
+    assert ok.sections_detected is True
+    assert bad.sections_detected is False
+
+    assert "공고 형식을 자동으로 나누지 못해" not in client.get(f"/jobs/{ok.id}").text
+    assert "공고 형식을 자동으로 나누지 못해" in client.get(f"/jobs/{bad.id}").text
+
+
 def test_create_job_missing_required_fields_returns_422(client):
     response = client.post("/jobs", data={"title": "", "position": "", "raw_text": ""})
     assert response.status_code == 422

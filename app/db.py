@@ -16,7 +16,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 # Stored in schema_meta so a fresh/older DB can tell which one-off migrations
 # it still needs. Column additions themselves stay idempotent via
 # _migrate_table_columns and don't need a version bump.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # (column, DDL type, default literal) for JobPosting columns added after the
 # table was first created. SQLite has no ALTER-TABLE-based migration tooling
@@ -36,6 +36,7 @@ _JOB_POSTING_NEW_COLUMNS = [
     ("applied_resume_id", "INTEGER", "0"),
     ("memo", "TEXT", "''"),
     ("is_inbound", "BOOLEAN", "0"),
+    ("sections_detected", "BOOLEAN", "0"),
 ]
 
 # NOTE: an older jobfit.db may still carry a physical "benefits" column from a
@@ -208,6 +209,31 @@ def _migrate_enum_codes() -> None:
         db.close()
 
 
+def _backfill_sections_detected() -> None:
+    """Fill the sections_detected flag for postings saved before that column
+    existed. Row-isolated like _backfill_job_postings."""
+    from sqlalchemy import select
+
+    from app.models import JobPosting
+    from app.services.job_parser import parse_job_posting
+
+    db = SessionLocal()
+    try:
+        ids = list(db.scalars(select(JobPosting.id).where(JobPosting.raw_text != "")))
+        for job_id in ids:
+            job = db.get(JobPosting, job_id)
+            try:
+                job.sections_detected = parse_job_posting(job.raw_text).sections_detected
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.warning(
+                    "job_posting %s sections_detected 백필 실패 — 건너뜁니다", job_id, exc_info=True
+                )
+    finally:
+        db.close()
+
+
 def _run_data_migrations() -> None:
     """One-off data migrations, each guarded by its own schema_meta flag so it
     runs exactly once per database. Add new steps here and bump SCHEMA_VERSION."""
@@ -217,6 +243,9 @@ def _run_data_migrations() -> None:
     if _get_meta("job_postings_backfilled") != "done":
         _backfill_job_postings()
         _set_meta("job_postings_backfilled", "done")
+    if _get_meta("sections_detected_backfilled") != "done":
+        _backfill_sections_detected()
+        _set_meta("sections_detected_backfilled", "done")
 
 
 def init_db():

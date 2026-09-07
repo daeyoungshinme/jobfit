@@ -76,6 +76,30 @@ def sections_for_resume(resume) -> dict[str, str]:
     return split_resume_sections(resume.raw_text or "")
 
 
+# 섹션 키 → 이력서 리뷰(resume_reviewer)에 노출되는 한국어 이름.
+SECTION_DISPLAY_NAMES = {
+    "career": "경력/경험",
+    "projects": "프로젝트",
+    "education": "학력",
+    "skills": "기술/스킬",
+}
+
+
+def detect_sections(resume) -> dict[str, bool]:
+    """이력서에 각 섹션이 존재하는지 — 섹션 존재 판정의 단일 진실 소스.
+
+    form 이력서는 structured 값을, file 이력서는 헤딩 스캔 결과를 신뢰한다.
+    본문에 키워드가 스쳤다고("OO대학교 졸업") 섹션 있음으로 치지 않는다 —
+    이전에 resume_reviewer 가 느슨한 re.search 로 오판하던 부분.
+    """
+    return {key: bool(text.strip()) for key, text in sections_for_resume(resume).items()}
+
+
+def detect_sections_from_text(raw_text: str) -> dict[str, bool]:
+    """Resume 객체 없이 raw_text 만으로 섹션 존재를 판정 (헤딩 스캔)."""
+    return {key: bool(text.strip()) for key, text in split_resume_sections(raw_text).items()}
+
+
 def split_blocks(section_text: str) -> list[str]:
     """섹션 본문을 개별 프로젝트/경력 항목으로 분리한다.
 

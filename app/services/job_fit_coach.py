@@ -89,12 +89,18 @@ def _build_suggestions(gaps: list[CategoryGap], owned_by_category: dict[str, lis
     return suggestions
 
 
-def build_coaching(resume_skills: list[str], job: JobPosting, *, resume_text: str = "") -> CoachingResult:
+def build_coaching(
+    resume_skills: list[str],
+    job: JobPosting,
+    *,
+    resume_text: str = "",
+    resume_sections: dict[str, bool] | None = None,
+) -> CoachingResult:
     match = compute_match(resume_skills, job)
     gaps = _group_missing_by_category(match.missing_required, match.missing_preferred)
     owned_by_category = _owned_skills_by_category(resume_skills, {gap.category for gap in gaps})
     suggestions = _build_suggestions(gaps, owned_by_category)
-    general_review = review_resume(resume_text, len(resume_skills))
+    general_review = review_resume(resume_text, len(resume_skills), sections=resume_sections)
     return CoachingResult(
         match=match,
         category_gaps=gaps,

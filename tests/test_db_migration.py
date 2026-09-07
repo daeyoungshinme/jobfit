@@ -184,6 +184,34 @@ def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplo
     assert any("2~8년" in r.message for r in caplog.records)  # 미상 값 로깅
 
 
+def test_backfill_sections_detected(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+    from app.models import JobPosting
+
+    s = db_module.SessionLocal()
+    try:
+        s.add_all([
+            JobPosting(title="헤더 있음", position="backend",
+                       raw_text="[자격요건]\nPython\n[우대사항]\nAWS", required_skills=[], preferred_skills=[]),
+            JobPosting(title="헤더 없음", position="backend",
+                       raw_text="그냥 줄글로만 된 공고입니다", required_skills=[], preferred_skills=[]),
+        ])
+        s.commit()
+    finally:
+        s.close()
+
+    db_module._backfill_sections_detected()
+
+    with engine.connect() as conn:
+        rows = dict(conn.execute(text("SELECT title, sections_detected FROM job_postings")).all())
+    assert rows["헤더 있음"]
+    assert not rows["헤더 없음"]
+
+
 def test_backfill_isolates_a_failing_row_and_logs_it(monkeypatch, caplog):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)

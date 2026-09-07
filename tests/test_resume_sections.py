@@ -1,6 +1,7 @@
 from app.models import Resume
 from app.services.resume_editor import compose_form_raw_text
 from app.services.resume_sections import (
+    detect_sections,
     first_line_label,
     sections_for_resume,
     split_blocks,
@@ -71,3 +72,35 @@ def test_sections_for_resume_scans_raw_text_for_file():
     )
     sections = sections_for_resume(resume)
     assert "결제 게이트웨이 구축" in sections["projects"]
+
+
+def test_detect_sections_form_trusts_structured():
+    resume = Resume(
+        label="r", source_type="form",
+        raw_text="무시됨",
+        structured={"career": "A사 3년", "projects": "", "education": "OO대", "skills_text": ""},
+        extracted_skills=[],
+    )
+    assert detect_sections(resume) == {
+        "career": True, "projects": False, "education": True, "skills": False,
+    }
+
+
+def test_detect_sections_file_requires_headings_not_prose():
+    prose = Resume(
+        label="r", source_type="file",
+        raw_text="이 회사에서 3년간 근무하며 OO대학교를 졸업했습니다.",
+        structured={"original_filename": "r.pdf"}, extracted_skills=[],
+    )
+    assert detect_sections(prose) == {
+        "career": False, "projects": False, "education": False, "skills": False,
+    }
+
+    headed = Resume(
+        label="r", source_type="file",
+        raw_text="경력\nA사 백엔드 2020-2023\n\n학력\nOO대 졸업",
+        structured={"original_filename": "r.pdf"}, extracted_skills=[],
+    )
+    detected = detect_sections(headed)
+    assert detected["career"] and detected["education"]
+    assert not detected["projects"]

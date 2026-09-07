@@ -2,14 +2,8 @@ import re
 
 from app.constants import RESUME_MIN_ACTION_VERB_HITS, RESUME_MIN_LENGTH, RESUME_MIN_QUANT_HITS
 from app.schemas import CoachingSuggestion
+from app.services.resume_sections import SECTION_DISPLAY_NAMES, detect_sections_from_text
 from app.services.text_utils import QUANT_PATTERN
-
-_SECTION_PATTERNS = {
-    "경력/경험": re.compile(r"경력|경험|근무|재직"),
-    "프로젝트": re.compile(r"프로젝트|project", re.IGNORECASE),
-    "학력": re.compile(r"학력|대학교|대학|졸업"),
-    "기술/스킬": re.compile(r"기술\s*스택|스킬|skill", re.IGNORECASE),
-}
 
 _IMPROVEMENT_WORD_PATTERN = re.compile(r"증가|감소|향상|절감|단축|달성|개선")
 _ACTION_VERBS = ["개발", "설계", "구축", "운영", "리드", "주도", "담당", "최적화", "도입", "분석", "기획", "해결"]
@@ -37,10 +31,19 @@ def extract_achievement_lines(raw_text: str, limit: int = 6) -> list[str]:
     return [text for _score, _idx, text in scored[:limit]]
 
 
-def review_resume(raw_text: str, extracted_skill_count: int) -> list[CoachingSuggestion]:
-    """Produce rule-based improvement suggestions for a resume."""
+def review_resume(
+    raw_text: str, extracted_skill_count: int, *, sections: dict[str, bool] | None = None
+) -> list[CoachingSuggestion]:
+    """Produce rule-based improvement suggestions for a resume.
+
+    `sections` (섹션 키 → 존재 여부)를 넘기면 그걸 신뢰한다. 없으면 raw_text 의
+    헤딩 스캔으로 계산 — Resume 객체를 가진 호출부는 resume_sections.detect_sections
+    를 넘겨 form 이력서의 structured 값을 반영하는 편이 정확하다.
+    """
     suggestions: list[CoachingSuggestion] = []
     text = raw_text or ""
+    if sections is None:
+        sections = detect_sections_from_text(text)
 
     if len(text.strip()) < RESUME_MIN_LENGTH:
         suggestions.append(CoachingSuggestion(
@@ -55,8 +58,8 @@ def review_resume(raw_text: str, extracted_skill_count: int) -> list[CoachingSug
             detail=f"현재 약 {len(text.strip())}자로, 세부 내용을 담기에 적절한 분량입니다.",
         ))
 
-    for section_name, pattern in _SECTION_PATTERNS.items():
-        if pattern.search(text):
+    for key, section_name in SECTION_DISPLAY_NAMES.items():
+        if sections.get(key):
             suggestions.append(CoachingSuggestion(
                 status="ok",
                 title=f"'{section_name}' 섹션이 확인됩니다",
@@ -66,7 +69,7 @@ def review_resume(raw_text: str, extracted_skill_count: int) -> list[CoachingSug
             suggestions.append(CoachingSuggestion(
                 status="warning",
                 title=f"'{section_name}' 섹션이 보이지 않습니다",
-                detail="채용담당자가 빠르게 파악할 수 있도록 해당 섹션을 명시적으로 추가하는 것을 권장합니다.",
+                detail="채용담당자가 빠르게 파악할 수 있도록 해당 섹션을 명시적으로(헤딩으로) 추가하는 것을 권장합니다.",
             ))
 
     quant_hits = len(QUANT_PATTERN.findall(text)) + len(_IMPROVEMENT_WORD_PATTERN.findall(text))

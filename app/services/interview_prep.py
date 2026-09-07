@@ -22,7 +22,12 @@ from app.schemas import (
 )
 from app.services.matcher import compute_match
 from app.services.resume_reviewer import review_resume
-from app.services.resume_sections import first_line_label, sections_for_resume, split_blocks
+from app.services.resume_sections import (
+    detect_sections,
+    first_line_label,
+    sections_for_resume,
+    split_blocks,
+)
 from app.services.skill_extractor import skill_category_map
 from app.services.text_utils import QUANT_PATTERN, UNKNOWN_CATEGORY, dedupe, strip_bullet, truncate
 
@@ -155,7 +160,9 @@ _SIGNAL_KEYWORDS = ["정량", "액션 동사", "분량", "섹션"]
 def _resume_signal_questions(resume: Resume) -> list[InterviewQuestion]:
     guide = load_interview_guide()
     signal_map = guide.get("resume_signal_questions", {})
-    reviews = review_resume(resume.raw_text or "", len(resume.extracted_skills or []))
+    reviews = review_resume(
+        resume.raw_text or "", len(resume.extracted_skills or []), sections=detect_sections(resume)
+    )
 
     out: list[InterviewQuestion] = []
     used: set[str] = set()

@@ -254,6 +254,7 @@ def apply_parsed_sections(job, parsed: ParsedJobPosting) -> None:
     job.preferred_text = parsed.preferred_text
     job.required_skills = parsed.required_skills
     job.preferred_skills = parsed.preferred_skills
+    job.sections_detected = parsed.sections_detected
 
 
 def parse_job_posting(raw_text: str) -> ParsedJobPosting:

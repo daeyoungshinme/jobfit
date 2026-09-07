@@ -12,6 +12,7 @@ from app.services.job_fit_coach import build_coaching
 from app.services.matcher import rank_matches, skill_ranking
 from app.services.profile_exporter import build_platform_profiles
 from app.services.resume_editor import apply_resume_content, validate_resume_content
+from app.services.resume_sections import detect_sections
 from app.templates import templates
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -87,7 +88,10 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
     if redirect:
         return redirect
 
-    coaching = build_coaching(resume.extracted_skills or [], job, resume_text=resume.raw_text)
+    coaching = build_coaching(
+        resume.extracted_skills or [], job,
+        resume_text=resume.raw_text, resume_sections=detect_sections(resume),
+    )
     return templates.TemplateResponse(
         request,
         "coach.html",
@@ -146,7 +150,10 @@ def interview(request: Request, resume_id: int = 0, job_id: int = 0, db: Session
 
 
 def _render_tailor(request, resume, job, *, errors=None, values=None, status_code=200):
-    coaching = build_coaching(resume.extracted_skills or [], job, resume_text=resume.raw_text)
+    coaching = build_coaching(
+        resume.extracted_skills or [], job,
+        resume_text=resume.raw_text, resume_sections=detect_sections(resume),
+    )
     return templates.TemplateResponse(
         request,
         "tailor.html",

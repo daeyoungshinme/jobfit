@@ -15,6 +15,7 @@ from app.routers._common import ResumeContentForm, get_or_404
 from app.services.resume_editor import apply_resume_content, new_resume, validate_resume_content
 from app.services.resume_parser import extract_text_from_upload
 from app.services.resume_reviewer import review_resume
+from app.services.resume_sections import detect_sections
 from app.services.validation import require_fields
 from app.templates import templates
 
@@ -101,7 +102,9 @@ def list_resumes(request: Request, db: Session = Depends(get_db)):
 @router.get("/{resume_id}")
 def resume_detail(resume_id: int, request: Request, db: Session = Depends(get_db)):
     resume = get_or_404(db, Resume, resume_id, RESUME_NOT_FOUND_DETAIL)
-    suggestions = review_resume(resume.raw_text, len(resume.extracted_skills or []))
+    suggestions = review_resume(
+        resume.raw_text, len(resume.extracted_skills or []), sections=detect_sections(resume)
+    )
     jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
     return templates.TemplateResponse(
         request,

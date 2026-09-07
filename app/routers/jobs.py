@@ -235,7 +235,6 @@ def list_jobs(
 @router.get("/{job_id}")
 def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
     job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
-    sections_detected = parse_job_posting(job.raw_text).sections_detected
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
     applied_resume = db.get(Resume, job.applied_resume_id) if job.applied_resume_id else None
     return templates.TemplateResponse(
@@ -243,7 +242,7 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
         "job_detail.html",
         {
             "job": job,
-            "sections_detected": sections_detected,
+            "sections_detected": job.sections_detected,
             "resumes": resumes,
             "suggested_channel": _suggested_channel(job.source_site),
             "applied_resume": applied_resume,

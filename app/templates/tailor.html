@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ job.title }} 맞춤 이력서 편집 - JobFit{% endblock %}
 {% block content %}
-{% from "_resume_fields.html" import resume_fields %}
+{% from "_resume_fields.html" import resume_fields, career_meta_fields %}
 {% from "_coaching.html" import score_card, category_gaps %}
 {% from "_forms.html" import error_banner, raw_text_editor %}
 <a href="/analysis/dashboard?resume_id={{ resume.id }}" class="back-link">&larr; 대시보드로</a>
@@ -52,6 +52,7 @@
       {% else %}
       {{ resume_fields(values=structured) }}
       {% endif %}
+      {{ career_meta_fields(values.total_years or resume.total_years, values.target_position or resume.target_position) }}
       <button type="submit" class="btn-primary">저장하고 매칭 다시 계산</button>
     </form>
   </div>

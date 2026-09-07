@@ -9,7 +9,7 @@ from app.routers._common import ResumeContentForm, load_resume_and_job
 from app.services.activity_report import build_activity_report
 from app.services.interview_prep import build_interview_prep
 from app.services.job_fit_coach import build_coaching
-from app.services.matcher import rank_matches, skill_ranking
+from app.services.matcher import MatchConfig, rank_matches, scarcity_weights, skill_ranking
 from app.services.profile_exporter import build_platform_profiles
 from app.services.resume_editor import apply_resume_content, validate_resume_content
 from app.services.resume_sections import detect_sections
@@ -23,6 +23,7 @@ def dashboard(
     request: Request,
     resume_id: int = 0,
     position: str = "",
+    axes: int = 0,
     db: Session = Depends(get_db),
 ):
     resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
@@ -30,13 +31,22 @@ def dashboard(
     if position:
         query = query.where(JobPosting.position == position)
     jobs = list(db.scalars(query))
+    ranking = skill_ranking(jobs)
 
     matches = []
     selected_resume = None
     if resume_id:
         selected_resume = db.get(Resume, resume_id)
         if selected_resume:
-            matches = rank_matches(selected_resume.extracted_skills or [], jobs)
+            # 희소 스킬 미보유에 더 큰 감점을 주고, ?axes=1 이면 경력 적합도 축을
+            # 최종 점수에 섞는다 (기본값은 투명 노출만).
+            config = MatchConfig(experience_weight=0.25) if axes else MatchConfig()
+            matches = rank_matches(
+                selected_resume.extracted_skills or [], jobs,
+                config=config,
+                skill_weights=scarcity_weights(ranking),
+                resume=selected_resume,
+            )
 
     return templates.TemplateResponse(
         request,
@@ -45,8 +55,9 @@ def dashboard(
             "resumes": resumes,
             "selected_resume": selected_resume,
             "selected_position": position,
+            "axes_on": bool(axes),
             "matches": matches,
-            "ranking": skill_ranking(jobs),
+            "ranking": ranking,
             "job_count": len(jobs),
         },
     )
@@ -94,6 +105,7 @@ def coach(request: Request, resume_id: int = 0, job_id: int = 0, db: Session = D
     coaching = build_coaching(
         resume.extracted_skills or [], job,
         resume_text=resume.raw_text, resume_sections=detect_sections(resume),
+        resume=resume,
     )
     return templates.TemplateResponse(
         request,
@@ -129,6 +141,7 @@ def _render_tailor(request, resume, job, *, errors=None, values=None, status_cod
     coaching = build_coaching(
         resume.extracted_skills or [], job,
         resume_text=resume.raw_text, resume_sections=detect_sections(resume),
+        resume=resume,
     )
     return templates.TemplateResponse(
         request,

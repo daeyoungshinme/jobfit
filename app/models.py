@@ -86,5 +86,9 @@ class Resume(Base):
     raw_text: Mapped[str] = mapped_column(Text)
     structured: Mapped[dict] = mapped_column(JSON, default=dict)
     extracted_skills: Mapped[list] = mapped_column(JSON, default=list)
+    # 경력 축 매칭용. total_years 는 총 경력 연차, target_position 은 POSITION 코드.
+    # job_parser/profile_exporter 추측으로 백필되고 이력서 폼에서 수정 가능.
+    total_years: Mapped[int] = mapped_column(Integer, default=0)
+    target_position: Mapped[str] = mapped_column(String(50), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

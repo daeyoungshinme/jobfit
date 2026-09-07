@@ -332,6 +332,12 @@ def _guess_position(title: str, raw_text: str) -> str:
     return ""
 
 
+def guess_position_code(title: str, raw_text: str = "") -> str:
+    """제목·본문에서 POSITION 코드를 추측한다 (없으면 ""). 공개 래퍼 —
+    이력서 target_position 백필 등 파서 밖에서도 재사용한다."""
+    return _guess_position(title, raw_text)
+
+
 def _experience_code_for_range(lo: int, hi: int) -> str:
     """(lo, hi) 가 표준 버킷의 경계와 정확히 일치하면 그 코드를, 아니면 "lo~hi년"
     자유 문자열을 돌려준다 (사용자가 공고에 적힌 정확한 수치를 보도록)."""

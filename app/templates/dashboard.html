@@ -49,7 +49,12 @@
 {% else %}
 {% set scored = matches|selectattr("has_skill_data")|list %}
 {% if scored %}
-<p class="hint">{{ scored|length }}개 공고 중 최고 매칭 점수는 <strong>{{ scored[0].score }}점</strong> ({{ scored[0].job_title }})입니다.</p>
+<p class="hint">{{ scored|length }}개 공고 중 최고 매칭 점수는 <strong>{{ scored[0].score }}점</strong> ({{ scored[0].job_title }})입니다.
+  점수는 시장에서 드물게 요구되는 스킬의 미보유에 더 큰 감점을 줍니다.
+  {% set qs = "resume_id=" ~ selected_resume.id ~ ("&position=" ~ selected_position if selected_position else "") %}
+  {% if axes_on %}<a href="?{{ qs }}">경력 적합도 빼고 스킬 점수만 보기</a>
+  {% else %}<a href="?{{ qs }}&axes=1">경력 적합도까지 반영해 보기</a>{% endif %}
+</p>
 {% endif %}
 <div class="table-scroll">
 <table class="data-table">
@@ -71,6 +76,7 @@
         {% if m.has_skill_data %}
         {{ score_bar(m.score) }}
         {{ m.score }}점
+        {% if m.experience_detail %}<br><span class="hint-inline">경력 {{ (m.experience_fit * 100)|round|int }}% · {{ m.experience_detail }}</span>{% endif %}
         {% else %}
         <span class="hint-inline">{{ NO_SKILL_DATA }}</span>
         {% endif %}

@@ -22,7 +22,10 @@ from sqlalchemy.orm import Session
 from app.enums import JOB_STATUS
 from app.models import JobPosting, Resume
 
-_CONTENT_FIELDS = ("raw_text", "career", "projects", "education", "skills_text")
+_CONTENT_FIELDS = (
+    "raw_text", "career", "projects", "education", "skills_text",
+    "total_years", "target_position",
+)
 
 
 class ResumeContentForm:
@@ -34,6 +37,8 @@ class ResumeContentForm:
         projects: str = Form(""),
         education: str = Form(""),
         skills_text: str = Form(""),
+        total_years: str = Form(""),
+        target_position: str = Form(""),
     ):
         self.label = label
         self.raw_text = raw_text
@@ -41,6 +46,8 @@ class ResumeContentForm:
         self.projects = projects
         self.education = education
         self.skills_text = skills_text
+        self.total_years = total_years
+        self.target_position = target_position
 
     def content_kwargs(self) -> dict:
         """kwargs for `validate_resume_content` / `apply_resume_content` / `new_resume`."""

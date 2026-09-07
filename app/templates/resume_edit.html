@@ -2,7 +2,7 @@
 {% block title %}{{ resume.label }} 수정 - JobFit{% endblock %}
 {% block content %}
 {% from "_forms.html" import text_field, error_banner, raw_text_editor %}
-{% from "_resume_fields.html" import resume_fields %}
+{% from "_resume_fields.html" import resume_fields, career_meta_fields %}
 {% set errors = errors or {} %}
 {% set v = values or {} %}
 <a href="/resumes/{{ resume.id }}" class="back-link">&larr; 이력서로</a>
@@ -21,6 +21,8 @@
   {% else %}
   {{ resume_fields(values=v if v else resume.structured) }}
   {% endif %}
+
+  {{ career_meta_fields(v.total_years if v else resume.total_years, v.target_position if v else resume.target_position) }}
 
   <button type="submit" class="btn-primary">수정 완료</button>
 </form>

@@ -16,7 +16,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 # Stored in schema_meta so a fresh/older DB can tell which one-off migrations
 # it still needs. Column additions themselves stay idempotent via
 # _migrate_table_columns and don't need a version bump.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 # (column, DDL type, default literal) for JobPosting columns added after the
 # table was first created. SQLite has no ALTER-TABLE-based migration tooling
@@ -52,11 +52,11 @@ _JOB_POSTING_NEW_COLUMNS = [
 # previous release. SQLite can't drop columns without a table rebuild, so the
 # column is left in place and simply ignored — the model no longer maps it.
 
-# Same pattern as _JOB_POSTING_NEW_COLUMNS, for the `resumes` table. Empty for
-# now — the wiring exists so a future Resume column just needs an entry here
-# (plus a dedicated backfill call in _run_data_migrations() if existing rows
-# must be filled).
-_RESUME_NEW_COLUMNS: list[tuple[str, str, str]] = []
+# Same pattern as _JOB_POSTING_NEW_COLUMNS, for the `resumes` table.
+_RESUME_NEW_COLUMNS: list[tuple[str, str, str]] = [
+    ("total_years", "INTEGER", "0"),
+    ("target_position", "VARCHAR(50)", "''"),
+]
 
 class Base(DeclarativeBase):
     pass
@@ -287,6 +287,35 @@ def _backfill_job_extras() -> None:
         db.close()
 
 
+def _backfill_resume_career() -> None:
+    """이력서 원문에서 총 경력 연차(total_years)와 목표 직무(target_position)를
+    추측해 채운다 — 해당 컬럼 도입 전에 저장된 이력서용. 행 단위로 격리한다."""
+    from sqlalchemy import select
+
+    from app.models import Resume
+    from app.services.job_parser import guess_position_code
+    from app.services.profile_exporter import guess_total_years
+
+    db = SessionLocal()
+    try:
+        ids = list(db.scalars(select(Resume.id).where(Resume.raw_text != "")))
+        for resume_id in ids:
+            resume = db.get(Resume, resume_id)
+            try:
+                if not resume.total_years:
+                    resume.total_years = guess_total_years(resume.raw_text) or 0
+                if not resume.target_position:
+                    resume.target_position = guess_position_code(resume.label, resume.raw_text)
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.warning(
+                    "resume %s 경력정보 백필 실패 — 건너뜁니다", resume_id, exc_info=True
+                )
+    finally:
+        db.close()
+
+
 def _run_data_migrations() -> None:
     """One-off data migrations, each guarded by its own schema_meta flag so it
     runs exactly once per database. Add new steps here and bump SCHEMA_VERSION."""
@@ -305,6 +334,9 @@ def _run_data_migrations() -> None:
     if _get_meta("job_extras_backfilled") != "done":
         _backfill_job_extras()
         _set_meta("job_extras_backfilled", "done")
+    if _get_meta("resume_career_backfilled") != "done":
+        _backfill_resume_career()
+        _set_meta("resume_career_backfilled", "done")
 
 
 def init_db():

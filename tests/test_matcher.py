@@ -1,4 +1,14 @@
-from app.services.matcher import MatchConfig, compute_match, rank_matches, skill_ranking
+from types import SimpleNamespace
+
+from app.schemas import SkillRank
+from app.services.matcher import (
+    MatchConfig,
+    compute_match,
+    experience_fit,
+    rank_matches,
+    scarcity_weights,
+    skill_ranking,
+)
 
 
 def test_compute_match_full_coverage_scores_100(make_job):
@@ -69,6 +79,62 @@ def test_related_credit_zero_reproduces_legacy_scoring(make_job):
     job = make_job(1, "공고", ["React"], [])
     legacy = MatchConfig(related_credit=0.0)
     assert compute_match(["Vue"], job, config=legacy).score == compute_match(["Python"], job).score
+
+
+def test_scarcity_weights_penalize_rare_skills_more():
+    ranking = [
+        SkillRank(name="Python", required_count=10, preferred_count=0, total_count=10, percentage=100.0),
+        SkillRank(name="Rust", required_count=1, preferred_count=0, total_count=1, percentage=10.0),
+    ]
+    weights = scarcity_weights(ranking)
+    assert weights["Python"] == 1.0
+    assert weights["Rust"] > weights["Python"]
+
+
+def test_skill_weights_make_rare_skill_gap_hurt_more(make_job):
+    # 두 스킬 모두 요구, 하나만 보유. 희소 스킬(Rust)을 놓치면 흔한 스킬(Python)을
+    # 놓칠 때보다 점수가 더 낮아야 한다.
+    job = make_job(1, "공고", ["Python", "Rust"], [])
+    weights = {"Python": 1.0, "Rust": 4.0}
+    miss_rare = compute_match(["Python"], job, skill_weights=weights).score
+    miss_common = compute_match(["Rust"], job, skill_weights=weights).score
+    assert miss_rare < miss_common
+    # weights=None 이면 둘이 같다 (현행).
+    assert (
+        compute_match(["Python"], job).score == compute_match(["Rust"], job).score
+    )
+
+
+def test_experience_fit_in_range_near_and_far():
+    assert experience_fit(4, "y3_5")[0] == 1.0            # 범위 안
+    assert experience_fit(2, "y3_5")[0] == 0.7            # 1년 부족 → 근접
+    assert experience_fit(0, "y5_10")[0] < 0.7            # 5년 부족 → 멀다
+    assert experience_fit(3, "무관") == (None, "")        # 축 제외
+    assert experience_fit(3, "") == (None, "")            # 미상
+    assert experience_fit(6, "2~8년")[0] == 1.0           # 자유 입력 범위 파싱(비표준)
+    assert experience_fit(10, "5년 이상")[0] == 1.0       # 하한만 있는 조건
+    assert experience_fit(12, "y3_5")[0] < 0.7            # 상한 초과(과경력)도 감점
+    assert experience_fit(0, "entry") == (1.0, "보유 0년 · 요구 신입")
+    assert experience_fit(3, "협의")[0] is None           # 해석 불가 자유 텍스트
+
+
+def test_experience_weight_zero_keeps_score_unchanged(make_job):
+    job = make_job(1, "공고", ["Python"], [])
+    job.experience_level = "y5_10"
+    resume = SimpleNamespace(total_years=1)
+    r = compute_match(["Python"], job, resume=resume)
+    assert r.score == 100.0                # weight 0 → 경력 미반영
+    assert r.experience_fit is not None    # 투명 노출용으로는 채워짐
+    assert "요구 5~10년" in r.experience_detail
+
+
+def test_experience_weight_folds_axis_into_score(make_job):
+    job = make_job(1, "공고", ["Python"], [])
+    job.experience_level = "y5_10"
+    resume = SimpleNamespace(total_years=1)
+    cfg = MatchConfig(experience_weight=0.25)
+    r = compute_match(["Python"], job, resume=resume, config=cfg)
+    assert r.score < 100.0  # 경력 미달이 점수를 끌어내린다
 
 
 def test_skill_ranking_counts_and_percentage(make_job):

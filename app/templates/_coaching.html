@@ -15,6 +15,9 @@
   {% else %}
   <span class="hint">{{ NO_SKILL_DATA_REASON }}</span>
   {% endif %}
+  {% if match.experience_detail %}
+  <p class="hint-inline">경력 적합도 {{ (match.experience_fit * 100)|round|int }}% <span class="meta">({{ match.experience_detail }})</span></p>
+  {% endif %}
 </div>
 {% endmacro %}
 

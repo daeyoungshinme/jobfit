@@ -95,8 +95,9 @@ def build_coaching(
     *,
     resume_text: str = "",
     resume_sections: dict[str, bool] | None = None,
+    resume=None,
 ) -> CoachingResult:
-    match = compute_match(resume_skills, job)
+    match = compute_match(resume_skills, job, resume=resume)
     gaps = _group_missing_by_category(match.missing_required, match.missing_preferred)
     owned_by_category = _owned_skills_by_category(resume_skills, {gap.category for gap in gaps})
     suggestions = _build_suggestions(gaps, owned_by_category)

@@ -7,7 +7,7 @@
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 
 from app.enums import JOB_STATUS
 
@@ -52,7 +52,9 @@ def _days_since(iso: str, today: date) -> int | None:
 
 
 def build_activity_report(jobs, today: date | None = None) -> ActivityReport:
-    today = today or date.today()
+    # applied_at 은 사용자 입력(로컬 날짜) 이지만 서버 기준일이 없으면 UTC 로 계산한다
+    # — 자정 경계에서 최대 하루 오차. 정확도가 필요하면 라우터가 today 를 주입한다.
+    today = today or datetime.now(timezone.utc).date()
     rows = [
         ActivityRow(
             job_id=job.id,

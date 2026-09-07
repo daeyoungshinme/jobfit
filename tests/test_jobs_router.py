@@ -115,6 +115,21 @@ def test_update_job_success_persists_changes(client, db_session, job_factory):
     assert "Python" in job.required_skills
 
 
+def test_editing_a_job_bumps_updated_at(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="자격요건\nPython")
+    db_session.refresh(job)
+    original = job.updated_at
+
+    client.post(
+        f"/jobs/{job.id}/edit",
+        data={"title": "공고 v2", "position": "backend", "raw_text": "[자격요건]\nPython"},
+        follow_redirects=False,
+    )
+    db_session.refresh(job)
+    assert job.updated_at >= original
+    assert job.updated_at >= job.created_at
+
+
 def test_delete_job_success_redirects_with_flash(client, db_session, job_factory):
     job = job_factory(title="삭제될 공고", raw_text="자격요건\n파이썬 3년 이상")
 

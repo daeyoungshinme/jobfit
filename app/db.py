@@ -16,7 +16,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 # Stored in schema_meta so a fresh/older DB can tell which one-off migrations
 # it still needs. Column additions themselves stay idempotent via
 # _migrate_table_columns and don't need a version bump.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # (column, DDL type, default literal) for JobPosting columns added after the
 # table was first created. SQLite has no ALTER-TABLE-based migration tooling
@@ -37,6 +37,9 @@ _JOB_POSTING_NEW_COLUMNS = [
     ("memo", "TEXT", "''"),
     ("is_inbound", "BOOLEAN", "0"),
     ("sections_detected", "BOOLEAN", "0"),
+    # SQLite 는 ALTER ADD COLUMN 에 CURRENT_TIMESTAMP 기본값을 못 쓴다 — NULL 로
+    # 추가하고 _backfill_updated_at() 이 기존 행을 created_at 으로 채운다.
+    ("updated_at", "DATETIME", "NULL"),
 ]
 
 # NOTE: an older jobfit.db may still carry a physical "benefits" column from a
@@ -234,6 +237,15 @@ def _backfill_sections_detected() -> None:
         db.close()
 
 
+def _backfill_updated_at() -> None:
+    """New job_postings.updated_at rows land as NULL (SQLite ALTER limitation);
+    seed them from created_at so existing postings aren't all "never updated"."""
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE job_postings SET updated_at = created_at WHERE updated_at IS NULL")
+        )
+
+
 def _run_data_migrations() -> None:
     """One-off data migrations, each guarded by its own schema_meta flag so it
     runs exactly once per database. Add new steps here and bump SCHEMA_VERSION."""
@@ -246,6 +258,9 @@ def _run_data_migrations() -> None:
     if _get_meta("sections_detected_backfilled") != "done":
         _backfill_sections_detected()
         _set_meta("sections_detected_backfilled", "done")
+    if _get_meta("job_updated_at_backfilled") != "done":
+        _backfill_updated_at()
+        _set_meta("job_updated_at_backfilled", "done")
 
 
 def init_db():

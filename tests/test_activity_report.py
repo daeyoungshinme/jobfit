@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from app.enums import JOB_STATUS
@@ -79,6 +79,13 @@ def test_recent_applications_desc_and_capped_at_10():
     report = build_activity_report(jobs, today=TODAY)
     assert len(report.recent_applications) == 10
     assert report.recent_applications[0].applied_at > report.recent_applications[-1].applied_at
+
+
+def test_today_defaults_to_utc_date():
+    utc_today = datetime.now(timezone.utc).date()
+    stale = _job(id=1, status="applied", applied_at=(utc_today - timedelta(days=30)).isoformat())
+    report = build_activity_report([stale])  # today 미주입
+    assert [r.job_id for r in report.awaiting_response] == [1]
 
 
 def test_applied_count_counts_status_or_date():

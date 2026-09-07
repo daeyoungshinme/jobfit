@@ -8,7 +8,9 @@ from app.enums import JOB_STATUS_DEFAULT
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    # 네이티브 UTC. DateTime 컬럼이 tz-aware 값을 받으면 SQLite 가 tz 정보를
+    # 버려서 저장/조회가 어긋나므로, 처음부터 tzinfo 를 떼고 UTC 기준으로 저장한다.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class JobPosting(Base):
@@ -42,6 +44,7 @@ class JobPosting(Base):
     # 헤드헌터·리크루터가 먼저 제안한 공고(리멤버/LinkedIn 인바운드)면 True.
     is_inbound: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
 class Resume(Base):

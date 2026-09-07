@@ -184,6 +184,33 @@ def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplo
     assert any("2~8년" in r.message for r in caplog.records)  # 미상 값 로깅
 
 
+def test_backfill_updated_at_seeds_from_created_at(monkeypatch):
+    engine = _make_isolated_engine()
+    monkeypatch.setattr(db_module, "engine", engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO job_postings (title, position, raw_text, created_at) "
+                "VALUES ('오래된 공고', 'backend', 'x', '2024-01-01 09:00:00')"
+            )
+        )
+
+    db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
+    db_module._backfill_updated_at()
+
+    with engine.connect() as conn:
+        created, updated = conn.execute(
+            text("SELECT created_at, updated_at FROM job_postings")
+        ).one()
+    assert updated == created
+
+    # 멱등: 두 번째 실행은 이미 채워진 행을 건드리지 않는다.
+    db_module._backfill_updated_at()
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT updated_at FROM job_postings")).scalar_one() == created
+
+
 def test_backfill_sections_detected(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)

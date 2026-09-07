@@ -27,7 +27,7 @@
     <div class="topbar-inner">
       <a class="brand" href="/jobs">JobFit</a>
       {% set nav_active = nav_active_for(request.url.path) %}
-      <nav class="primary-nav">
+      <nav class="primary-nav" aria-label="주요 메뉴">
         <a href="/jobs" class="nav-link" {% if nav_active == "jobs" %}aria-current="page"{% endif %}>
           <span class="nav-icon" aria-hidden="true">📋</span><span class="nav-label">공고</span>
         </a>

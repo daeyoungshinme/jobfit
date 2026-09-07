@@ -49,17 +49,21 @@
 {% else %}
 {% set scored = matches|selectattr("has_skill_data")|list %}
 {% if scored %}
-<p class="hint">{{ scored|length }}개 공고 중 최고 매칭 점수는 <strong>{{ scored[0].score }}점</strong> ({{ scored[0].job_title }})입니다.
-  점수는 시장에서 드물게 요구되는 스킬의 미보유에 더 큰 감점을 줍니다.
-  {% set qs = "resume_id=" ~ selected_resume.id ~ ("&position=" ~ selected_position if selected_position else "") %}
-  {% if axes_on %}<a href="?{{ qs }}">경력 적합도 빼고 스킬 점수만 보기</a>
-  {% else %}<a href="?{{ qs }}&axes=1">경력 적합도까지 반영해 보기</a>{% endif %}
+<p class="hint">{{ scored|length }}개 공고 중 최고 매칭 점수는 <strong>{{ scored[0].score }}점</strong> ({{ scored[0].job_title }}).
+  점수는 시장에서 드물게 요구되는 스킬의 미보유에 더 큰 감점을 줍니다.</p>
+{% set qs = "resume_id=" ~ selected_resume.id ~ ("&position=" ~ selected_position if selected_position else "") %}
+<p class="axes-toggle">
+  {% if axes_on %}<a href="?{{ qs }}" class="btn-secondary">경력 적합도 빼고 스킬 점수만 보기</a>
+  <span class="hint-inline">현재 경력 적합도를 점수에 반영 중</span>
+  {% else %}<a href="?{{ qs }}&axes=1" class="btn-secondary">경력 적합도까지 반영해 보기</a>
+  <span class="hint-inline">현재 스킬 점수만 표시 (경력 적합도는 참고용)</span>{% endif %}
 </p>
 {% endif %}
 <div class="table-scroll">
 <table class="data-table">
+  <caption class="visually-hidden">{{ selected_resume.label }} 기준 채용공고별 매칭 점수와 부족한 스킬, 우선순위 순</caption>
   <thead>
-    <tr><th>우선순위</th><th>공고</th><th>상태</th><th>매칭 점수</th><th>부족한 필수 스킬</th><th>부족한 우대 스킬</th><th>액션</th></tr>
+    <tr><th scope="col">우선순위</th><th scope="col">공고</th><th scope="col">상태</th><th scope="col">매칭 점수</th><th scope="col">부족한 필수 스킬</th><th scope="col">부족한 우대 스킬</th><th scope="col">액션</th></tr>
   </thead>
   <tbody>
     {% for m in matches %}

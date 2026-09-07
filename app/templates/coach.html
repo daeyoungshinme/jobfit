@@ -11,19 +11,23 @@
 
 {{ category_gaps(coaching.category_gaps) }}
 
-<div class="card">
-  <h3>이 공고 맞춤 보완 가이드</h3>
-  {{ suggestion_list(coaching.suggestions) }}
-</div>
+<section aria-labelledby="guide-h">
+  <h2 id="guide-h">이 공고 맞춤 보완 가이드</h2>
+  <div class="card">
+    {{ suggestion_list(coaching.suggestions) }}
+  </div>
+</section>
 
-<div class="card">
-  <h3>이력서 일반 체크리스트</h3>
-  <p class="hint">특정 공고와 무관하게 이력서 전반(분량, 항목 구성, 정량 성과, 액션 동사 등)을 점검합니다.</p>
-  {{ suggestion_list(coaching.general_review) }}
-</div>
+<section aria-labelledby="review-h">
+  <h2 id="review-h">이력서 일반 체크리스트</h2>
+  <div class="card">
+    <p class="hint">특정 공고와 무관하게 이력서 전반(분량, 항목 구성, 정량 성과, 액션 동사 등)을 점검합니다.</p>
+    {{ suggestion_list(coaching.general_review) }}
+  </div>
+</section>
 
-<p>
+<div class="detail-actions">
   <a href="/analysis/tailor?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-primary">{{ FEATURE_TAILOR }}하기</a>
   <a href="/analysis/interview?resume_id={{ resume.id }}&job_id={{ job.id }}" class="btn-secondary">면접 예상 질문 보기</a>
-</p>
+</div>
 {% endblock %}

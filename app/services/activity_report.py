@@ -12,7 +12,6 @@ from datetime import date, datetime, timezone
 from app.constants import STALE_AFTER_DAYS
 from app.enums import JOB_STATUS
 
-_ADVANCED = JOB_STATUS.codes_where("advanced")
 _APPLIED = JOB_STATUS.codes_where("applied")
 _EARLY_STAGE = JOB_STATUS.codes_where("early")
 _AWAITING = JOB_STATUS.codes_where("awaiting")  # 지원완료(아직 미진행)

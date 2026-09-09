@@ -5,7 +5,6 @@
 """
 
 from dataclasses import dataclass
-from datetime import date
 
 from sqlalchemy import select
 
@@ -71,18 +70,3 @@ def timeline(events: list[ApplicationEvent]) -> list[TimelineEntry]:
         else:
             out.append(TimelineEntry("note", "메모", event.detail, stamp))
     return out
-
-
-def upcoming_interviews(events: list[ApplicationEvent], today: date) -> list[ApplicationEvent]:
-    """오늘 이후(포함) 날짜가 잡힌 면접 이벤트, 가까운 순."""
-    def _parsed(value: str):
-        try:
-            return date.fromisoformat(value)
-        except ValueError:
-            return None
-
-    dated = [(e, _parsed(e.event_at)) for e in events if e.kind == "interview"]
-    return [e for e, d in sorted(
-        (pair for pair in dated if pair[1] is not None and pair[1] >= today),
-        key=lambda pair: pair[1],
-    )]

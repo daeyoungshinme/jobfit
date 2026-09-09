@@ -6,6 +6,7 @@ from app.services.text_utils import (
     UNKNOWN_CATEGORY,
     dedupe,
     strip_bullet,
+    strip_edge_decoration,
     truncate,
 )
 
@@ -40,6 +41,19 @@ def test_strip_bullet_removes_one_prefix():
     assert strip_bullet("- 결제 게이트웨이 구축") == "결제 게이트웨이 구축"
     assert strip_bullet("  * 로그 파이프라인 ") == "로그 파이프라인"
     assert strip_bullet("일반 문장") == "일반 문장"
+
+
+@pytest.mark.parametrize(
+    "line,expected",
+    [
+        ("  - 주요 성과 —", "주요 성과"),
+        ("· 프로젝트 리드 :", "프로젝트 리드"),
+        ("주요 성과: 매출 20% 증가", "주요 성과: 매출 20% 증가"),  # 중간 콜론은 유지
+        ("＊＊ 강조 ＊＊", "＊＊ 강조 ＊＊"),  # 전각 별표는 장식 문자 아님
+    ],
+)
+def test_strip_edge_decoration(line, expected):
+    assert strip_edge_decoration(line) == expected
 
 
 def test_truncate_boundary():

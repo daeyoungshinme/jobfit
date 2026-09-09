@@ -29,7 +29,14 @@ from app.services.resume_sections import (
     split_blocks,
 )
 from app.services.skill_extractor import skill_category_map
-from app.services.text_utils import QUANT_PATTERN, UNKNOWN_CATEGORY, dedupe, strip_bullet, truncate
+from app.services.text_utils import (
+    QUANT_PATTERN,
+    UNKNOWN_CATEGORY,
+    dedupe,
+    strip_bullet,
+    strip_edge_decoration,
+    truncate,
+)
 
 GUIDE_PATH = Path(__file__).resolve().parent.parent / "data" / "interview_guide.json"
 
@@ -88,7 +95,7 @@ def _role_fit_questions(job: JobPosting) -> list[InterviewQuestion]:
     task_template = guide.get("main_task_question_template", '"{task}" 관련 경험을 설명해주세요.')
     tasks: list[str] = []
     for line in (job.main_tasks or "").splitlines():
-        cleaned = strip_bullet(line).strip(" \t·-–—")
+        cleaned = strip_edge_decoration(strip_bullet(line))
         if len(cleaned) > 6:
             tasks.append(cleaned)
     for task in dedupe(tasks)[:_MAX_MAIN_TASK_Q]:

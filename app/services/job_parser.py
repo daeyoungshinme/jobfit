@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from app.constants import MAX_RAW_TEXT_CHARS
 from app.enums import EXPERIENCE_LEVEL, POSITION, REGION
+from app.services.experience import EXPERIENCE_MIN_RE, EXPERIENCE_RANGE_RE
 from app.services.skill_extractor import extract_skill_names, term_pattern
 
 _MAIN_TASKS_HEADERS = [r"주요\s*업무", r"담당\s*업무", r"업무\s*내용", r"직무\s*내용", r"하는\s*일"]
@@ -114,12 +115,10 @@ _METADATA_LINE_PATTERN = re.compile(
     r"^(?P<company>[^∙·•\n]{1,50}?)[ \t]*[∙·•][ \t]*[^∙·•\n]{1,30}?[ \t]*[∙·•][ \t]*경력"
 )
 
-# Capped at 1-2 digits since real experience ranges ("3~5년") never go past
-# double digits — an unbounded \d+ would also match unrelated 4-digit year
-# ranges like "2020-2023년" (founding year, funding round) as if they were
-# an experience level.
-_EXPERIENCE_RANGE_PATTERN = re.compile(r"\b(\d{1,2})\s*[~\-]\s*(\d{1,2})\s*년")
-_EXPERIENCE_MIN_PATTERN = re.compile(r"(\d+)\s*년\s*이상")
+# 경력 범위/하한 정규식은 app/services/experience.py 가 단일 소스 (matcher 와 공유).
+# 1~2자리 상한으로 "2020-2023년"(설립연도) 같은 4자리 연도 범위를 배제한다.
+_EXPERIENCE_RANGE_PATTERN = EXPERIENCE_RANGE_RE
+_EXPERIENCE_MIN_PATTERN = EXPERIENCE_MIN_RE
 
 _ADDRESS_LABEL_PATTERN = re.compile(r"(?:회사\s*)?(?:주소|근무지|위치)\s*[:：]\s*(?P<value>.+)")
 _SIDO_NAMES = "|".join(re.escape(code) for code in REGION.codes())

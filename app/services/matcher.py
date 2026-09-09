@@ -1,12 +1,11 @@
 import math
-import re
 from collections import Counter
 from dataclasses import dataclass
 
 from app.constants import MATCH_PREFERRED_WEIGHT, MATCH_REQUIRED_WEIGHT
-from app.enums import EXPERIENCE_LEVEL
 from app.models import JobPosting
 from app.schemas import MatchResult, SkillRank
+from app.services.experience import describe_bounds, parse_experience_bounds
 from app.services.skill_extractor import related_skill_map
 
 
@@ -81,46 +80,13 @@ def _score_axis(
     return exact, related, missing, (total / denom if denom else 1.0)
 
 
-_EXPERIENCE_RANGE_RE = re.compile(r"(\d{1,2})\s*~\s*(\d{1,2})\s*년")
-_EXPERIENCE_MIN_RE = re.compile(r"(\d{1,2})\s*년\s*(?:이상|~|\+)")
-
-
-def _experience_bounds(job_experience: str) -> tuple[int, int | None] | None:
-    """공고 경력 조건 → (min_years, max_years|None). 축이 적용되지 않으면 None
-    ('무관'·미상·자유 텍스트). 표준 버킷 코드/라벨을 먼저 보고, 아니면
-    '3~5년'·'5년 이상' 같은 자유 입력 문자열을 정규식으로 해석한다."""
-    if not job_experience:
-        return None
-    member = EXPERIENCE_LEVEL.get(EXPERIENCE_LEVEL.normalize(job_experience))
-    if member is not None:
-        if member.meta.get("bucket") is None:  # "무관"
-            return None
-        return member.meta.get("min_years", 0), member.meta.get("max_years")
-    range_match = _EXPERIENCE_RANGE_RE.search(job_experience)
-    if range_match:
-        lo, hi = int(range_match.group(1)), int(range_match.group(2))
-        return (lo, hi) if lo <= hi else (hi, lo)
-    min_match = _EXPERIENCE_MIN_RE.search(job_experience)
-    if min_match:
-        return int(min_match.group(1)), None
-    return None
-
-
-def _describe_bounds(lo: int, hi: int | None) -> str:
-    if hi is None:
-        return f"{lo}년 이상"
-    if lo == hi:
-        return "신입" if lo == 0 else f"{lo}년"
-    return f"{lo}~{hi}년"
-
-
 def experience_fit(total_years: int, job_experience: str) -> tuple[float | None, str]:
     """(적합도 0~1, 설명 문자열). 축이 적용되지 않으면 (None, "")."""
-    bounds = _experience_bounds(job_experience)
+    bounds = parse_experience_bounds(job_experience)
     if bounds is None:
         return None, ""
     lo, hi = bounds
-    detail = f"보유 {total_years}년 · 요구 {_describe_bounds(lo, hi)}"
+    detail = f"보유 {total_years}년 · 요구 {describe_bounds(lo, hi)}"
     if total_years < lo:
         gap = lo - total_years
     elif hi is not None and total_years > hi:

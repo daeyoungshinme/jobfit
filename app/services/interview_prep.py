@@ -7,11 +7,10 @@
 """
 
 import json
-import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.enums import EXPERIENCE_LEVEL, POSITION
+from app.enums import POSITION
 from app.models import JobPosting, Resume
 from app.schemas import (
     InterviewPrep,
@@ -20,6 +19,7 @@ from app.schemas import (
     MatchResult,
     StudyTopic,
 )
+from app.services.experience import experience_bucket
 from app.services.matcher import compute_match
 from app.services.resume_reviewer import review_resume
 from app.services.resume_sections import (
@@ -178,17 +178,6 @@ def _resume_signal_questions(resume: Resume) -> list[InterviewQuestion]:
     return out
 
 
-def _experience_bucket(experience_level: str) -> str | None:
-    """경력 코드 또는 자유 입력 범위("2~8년") → 행동 질문 버킷("신입"/"경력"/None)."""
-    member = EXPERIENCE_LEVEL.get(EXPERIENCE_LEVEL.normalize(experience_level))
-    if member is not None:
-        return member.meta.get("bucket")
-    lead = re.match(r"\s*(\d+)", experience_level or "")
-    if lead:
-        return "신입" if int(lead.group(1)) == 0 else "경력"
-    return None
-
-
 def _behavioral_questions(job: JobPosting | None) -> list[InterviewQuestion]:
     guide = load_interview_guide()
     behavioral = guide.get("behavioral", {})
@@ -197,7 +186,7 @@ def _behavioral_questions(job: JobPosting | None) -> list[InterviewQuestion]:
         _q(_CAT_BEHAVIORAL, question, "직무·경력과 무관하게 자주 나오는 공통 질문입니다.")
         for question in behavioral.get("공통", [])[:_MAX_BEHAVIORAL_COMMON]
     ]
-    bucket = _experience_bucket(job.experience_level or "") if job is not None else None
+    bucket = experience_bucket(job.experience_level or "") if job is not None else None
     if bucket:
         for question in behavioral.get(bucket, []):
             out.append(_q(_CAT_BEHAVIORAL, question, f"{bucket} 지원자에게 나올 법한 질문입니다."))

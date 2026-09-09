@@ -1,4 +1,3 @@
-import re
 from datetime import date
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
@@ -27,6 +26,7 @@ from app.enums import (
 from app.models import JobPosting, Resume
 from app.routers._common import get_or_404, load_job, normalize_job_status
 from app.services import application_log
+from app.services.dates import is_iso_date
 from app.services.job_parser import (
     apply_parsed_sections,
     guess_posting_fields,
@@ -39,8 +39,6 @@ from app.services.validation import require_fields
 from app.templates import templates
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _suggested_channel(source_site: str) -> str:
@@ -368,7 +366,7 @@ def update_job_application(
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
     if applied_via and channel_code is None:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
-    if applied_at and not _ISO_DATE.match(applied_at):
+    if applied_at and not is_iso_date(applied_at):
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
 
     if status_code:
@@ -397,7 +395,7 @@ def add_job_interview(
     if redirect:
         return redirect
     event_at = event_at.strip()
-    if not _ISO_DATE.match(event_at):
+    if not is_iso_date(event_at):
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
     application_log.add_interview_event(db, job_id, event_at, detail.strip())
     db.commit()

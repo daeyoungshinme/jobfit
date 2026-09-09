@@ -30,6 +30,7 @@ from app.enums import (
     REMOTE_POLICY,
     enum_label,
 )
+from app.services.dates import parse_iso_date
 from app.services.text_formatter import render_bulleted_html
 
 _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
@@ -46,9 +47,8 @@ def deadline_dday(deadline: str | None, *, today: date | None = None) -> dict | 
     """
     if not deadline or deadline.strip() in ("", "상시"):
         return None
-    try:
-        due = date.fromisoformat(deadline.strip())
-    except ValueError:
+    due = parse_iso_date(deadline)
+    if due is None:
         return None
     days = (due - (today or date.today())).days
     if days < 0:

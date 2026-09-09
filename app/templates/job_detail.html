@@ -19,7 +19,6 @@
   {% if job.remote_policy %}<span class="tag tag-source">{{ enum_label("remote_policy", job.remote_policy) }}</span>{% endif %}
   {% set dd = deadline_dday(job.deadline) %}
   {% if dd %}<span class="tag {{ dd.css }}" title="마감일 {{ job.deadline }}">{{ dd.badge }}</span>
-  {% elif job.deadline == "상시" %}<span class="tag tag-source">상시 채용</span>
   {% elif job.deadline %}<span class="tag tag-source">마감 {{ job.deadline }}</span>{% endif %}
   {% if job.salary_text %} · {{ job.salary_text }}{% endif %}
 </p>

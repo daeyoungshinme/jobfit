@@ -100,9 +100,11 @@ _POSITION_TERMS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 _BRACKET_TITLE_PATTERN = re.compile(r"^\[(?P<company>[^\]]{1,50})\]\s*(?P<rest>.+)$")
-# Excludes common trailing punctuation from the \S+ name capture so e.g.
+# Excludes common trailing punctuation from the name capture so e.g.
 # "(주)ABC," or "(주)ABC)" doesn't sweep the punctuation into the guessed name.
-_COMPANY_NAME_CHARS = r"[^\s,.)\]}]+"
+# Bounded (not "+") so a long run of non-delimiter chars with no "주식회사"
+# can't drive O(n^2) backtracking on a pathological line.
+_COMPANY_NAME_CHARS = r"[^\s,.)\]}]{1,40}"
 _COMPANY_PATTERN = re.compile(
     rf"\(주\)\s?{_COMPANY_NAME_CHARS}|㈜\s?{_COMPANY_NAME_CHARS}|{_COMPANY_NAME_CHARS}\s?주식회사"
 )

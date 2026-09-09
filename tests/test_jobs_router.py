@@ -292,6 +292,15 @@ def test_preview_rejects_oversized_raw_text(client):
     assert "너무 깁니다" in response.json()["detail"]
 
 
+def test_create_job_rejects_oversized_raw_text(client):
+    response = client.post(
+        "/jobs",
+        data={"title": "공고", "position": "backend", "raw_text": "가" * 50_001},
+    )
+    assert response.status_code == 422
+    assert "너무 깁니다" in response.text
+
+
 def test_create_job_rejects_unknown_position(client, db_session):
     response = client.post(
         "/jobs",

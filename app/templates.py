@@ -42,11 +42,14 @@ _DEADLINE_URGENT_DAYS = 7
 def deadline_dday(deadline: str | None, *, today: date | None = None) -> dict | None:
     """공고 마감일 문자열 → 목록/상세에서 쓸 뱃지 정보 dict, 아니면 None.
 
-    None 이면 호출부가 마감 뱃지를 생략한다('상시'·빈값·해석 불가). `urgent`
-    는 마감까지 7일 이하(오늘 포함)일 때 True — 목록에서 눈에 띄게 표시한다.
+    None 은 빈값·해석 불가일 때만 (호출부가 뱃지 생략). '상시'는 별도 뱃지 dict 를
+    돌려주므로 호출부가 이를 따로 검사할 필요 없다. `urgent` 는 마감까지 7일 이하
+    (오늘 포함)일 때 True — 목록에서 눈에 띄게 표시한다.
     """
-    if not deadline or deadline.strip() in ("", "상시"):
+    if not deadline or not deadline.strip():
         return None
+    if deadline.strip() == "상시":
+        return {"badge": "상시 채용", "css": "tag-source", "urgent": False, "days": None}
     due = parse_iso_date(deadline)
     if due is None:
         return None

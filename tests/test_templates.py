@@ -5,11 +5,17 @@ from app.templates import deadline_dday
 _TODAY = date(2026, 9, 7)
 
 
-def test_deadline_dday_none_for_missing_or_always_hiring():
+def test_deadline_dday_none_for_missing_or_unparseable():
     assert deadline_dday("", today=_TODAY) is None
     assert deadline_dday(None, today=_TODAY) is None
-    assert deadline_dday("상시", today=_TODAY) is None
     assert deadline_dday("나중에", today=_TODAY) is None  # 해석 불가
+
+
+def test_deadline_dday_always_hiring_returns_badge():
+    always = deadline_dday("상시", today=_TODAY)
+    assert always["badge"] == "상시 채용"
+    assert always["urgent"] is False
+    assert always["days"] is None
 
 
 def test_deadline_dday_urgent_within_a_week():

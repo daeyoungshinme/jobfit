@@ -118,6 +118,10 @@ class JobForm:
             errors["position"] = "알 수 없는 직무입니다."
         if self.status and not JOB_STATUS.has(self.status):
             errors["status"] = JOB_STATUS_INVALID_DETAIL
+        # preview 는 초과 시 400 을 주는데 저장 경로는 캡 없이 넣고 있었다 —
+        # 파서 입력만 잘리고 raw_text 컬럼엔 초과분이 그대로 저장되던 불일치.
+        if len(self.raw_text) > MAX_RAW_TEXT_CHARS:
+            errors["raw_text"] = MAX_RAW_TEXT_MESSAGE
         return errors
 
 

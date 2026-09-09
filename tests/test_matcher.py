@@ -75,10 +75,12 @@ def test_related_skill_listed_in_related_required_but_still_missing(make_job):
     assert "Python" in r.matched_required
 
 
-def test_related_credit_zero_reproduces_legacy_scoring(make_job):
+def test_related_skill_gets_partial_credit_between_miss_and_exact(make_job):
     job = make_job(1, "공고", ["React"], [])
-    legacy = MatchConfig(related_credit=0.0)
-    assert compute_match(["Vue"], job, config=legacy).score == compute_match(["Python"], job).score
+    exact = compute_match(["React"], job).score       # 정확 보유
+    related = compute_match(["Vue"], job).score       # 대체 스킬만 보유
+    none = compute_match(["Python"], job).score       # 무관
+    assert none < related < exact                     # related 는 부분 점수
 
 
 def test_scarcity_weights_penalize_rare_skills_more():

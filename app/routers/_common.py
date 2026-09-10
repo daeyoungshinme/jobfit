@@ -13,19 +13,33 @@ Resource-not-found policy (kept consistent by using these helpers):
     unknown is a stale or hand-edited link, not a bad route → `load_job` /
     `load_resume` return a 303 redirect to the relevant list with a flash,
     so the user lands somewhere useful instead of a dead end.
+    Exception: `analysis.py::dashboard` / `profile` fetch `?resume_id` with a
+    bare `db.get` and just render an empty selector for an unknown id, since
+    those pages *are* the picker — there's nowhere more useful to send you.
 """
 
 from fastapi import Form, HTTPException
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.enums import JOB_STATUS
 from app.models import JobPosting, Resume
+from app.services.resume_editor import validate_resume_content
+from app.services.validation import require_fields
+
+
+def list_all(db: Session, model):
+    """`list(db.scalars(select(model).order_by(model.created_at.desc())))` —
+    the newest-first "all rows" query every list/picker page repeats."""
+    return list(db.scalars(select(model).order_by(model.created_at.desc())))
 
 _CONTENT_FIELDS = (
     "raw_text", "career", "projects", "education", "skills_text",
     "total_years", "target_position",
 )
+
+LABEL_REQUIRED_MESSAGE = {"label": "이력서 이름을 입력해주세요."}
 
 
 class ResumeContentForm:
@@ -56,6 +70,14 @@ class ResumeContentForm:
     def error_values(self) -> dict:
         """Context for re-rendering a form with validation errors."""
         return {"label": self.label, **self.content_kwargs()}
+
+    def validation_errors(self, source_type: str) -> dict:
+        """Required-label + content errors, keyed by field. Mirrors
+        `jobs.py::JobForm.validation_errors`. `source_type` is "form" on create,
+        the existing résumé's source on edit."""
+        errors = require_fields({"label": self.label}, LABEL_REQUIRED_MESSAGE)
+        errors.update(validate_resume_content(source_type, **self.content_kwargs()))
+        return errors
 
 
 def get_or_404(db: Session, model, pk, detail: str):

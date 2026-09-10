@@ -23,7 +23,7 @@ from app.enums import (
     REMOTE_POLICY,
 )
 from app.models import JobPosting, Resume
-from app.routers._common import get_or_404, load_job, normalize_job_status
+from app.routers._common import get_or_404, list_all, load_job, normalize_job_status
 from app.services import application_log
 from app.services.dates import is_iso_date
 from app.services.job_editor import (
@@ -239,7 +239,7 @@ def list_jobs(
 @router.get("/{job_id}")
 def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
     job = get_or_404(db, JobPosting, job_id, JOB_NOT_FOUND_DETAIL)
-    resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
+    resumes = list_all(db, Resume)
     applied_resume = db.get(Resume, job.applied_resume_id) if job.applied_resume_id else None
     return templates.TemplateResponse(
         request,

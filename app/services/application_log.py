@@ -22,6 +22,11 @@ def events_for_job(db, job_id: int) -> list[ApplicationEvent]:
     )
 
 
+def all_interview_events(db) -> list[ApplicationEvent]:
+    """모든 공고의 면접 이벤트 (activity 리포트가 job_id 로 묶는다)."""
+    return list(db.scalars(select(ApplicationEvent).where(ApplicationEvent.kind == "interview")))
+
+
 def record_status_change(db, job, new_code: str) -> ApplicationEvent | None:
     """job.status 가 실제로 바뀔 때만 "status" 이벤트를 남긴다. 호출부가 commit."""
     old_code = job.status or ""

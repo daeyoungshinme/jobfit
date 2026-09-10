@@ -9,6 +9,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app import db as db_module
+from app import migrations
 
 
 def _use_temp_db(monkeypatch, tmp_path):
@@ -29,14 +30,12 @@ def test_init_db_creates_schema_and_is_repeatable(monkeypatch, tmp_path):
 
     with engine.connect() as conn:
         job_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(job_postings)"))}
-        version = conn.execute(text("SELECT value FROM schema_meta WHERE key = 'schema_version'")).scalar_one()
         backfill_flag = conn.execute(
-            text("SELECT value FROM schema_meta WHERE key = 'job_postings_backfilled'")
+            text("SELECT value FROM schema_meta WHERE key = 'job_postings_reparsed_v2'")
         ).scalar_one()
 
-    for column, _ddl, _default in db_module._JOB_POSTING_NEW_COLUMNS:
+    for column, _ddl, _default in migrations._JOB_POSTING_NEW_COLUMNS:
         assert column in job_columns
-    assert version == str(db_module.SCHEMA_VERSION)
     assert backfill_flag == "done"
 
     with engine.connect() as conn:
@@ -67,8 +66,47 @@ def test_init_db_backfill_runs_once(monkeypatch, tmp_path):
     finally:
         session.close()
 
-    db_module.init_db()  # 플래그가 이미 있으므로 백필이 다시 돌지 않는다
+    db_module.init_db()  # 플래그가 이미 있으므로 재파싱이 다시 돌지 않는다
 
     with engine.connect() as conn:
         required_text = conn.execute(text("SELECT required_text FROM job_postings")).scalar_one()
-    assert required_text == ""  # 백필이 재실행됐다면 채워졌을 것
+    assert required_text == ""  # 재파싱이 재실행됐다면 채워졌을 것
+
+
+def test_init_db_adopts_v2_flag_from_legacy_backfill_flags(monkeypatch, tmp_path):
+    """구버전(3개 패스)으로 이미 마이그레이션된 DB: 통합 v2 플래그가 없어도
+    구 플래그 3개가 done 이면 재파싱을 다시 돌리지 않고 플래그만 채택한다 —
+    onupdate=_now 때문에 updated_at 이 튀는 걸 피한다."""
+    engine = _use_temp_db(monkeypatch, tmp_path)
+    db_module.init_db()
+
+    from app.models import JobPosting
+
+    session = db_module.SessionLocal()
+    try:
+        session.add(
+            JobPosting(
+                title="공고", company="회사", position="백엔드",
+                raw_text="[자격요건]\nPython", required_text="",
+                required_skills=[], preferred_skills=[],
+            )
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    # 구버전 상태 재현: v2 플래그 제거, 구 플래그 3개를 done 으로.
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM schema_meta WHERE key = 'job_postings_reparsed_v2'"))
+    for flag in ("job_postings_backfilled", "sections_detected_backfilled", "job_extras_backfilled"):
+        migrations._set_meta(flag, "done")
+
+    db_module.init_db()
+
+    with engine.connect() as conn:
+        required_text = conn.execute(text("SELECT required_text FROM job_postings")).scalar_one()
+        v2_flag = conn.execute(
+            text("SELECT value FROM schema_meta WHERE key = 'job_postings_reparsed_v2'")
+        ).scalar_one()
+    assert required_text == ""  # 재파싱이 돌지 않았다
+    assert v2_flag == "done"    # 플래그만 채택됐다

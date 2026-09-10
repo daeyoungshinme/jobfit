@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.constants import STALE_AFTER_DAYS
 from app.db import get_db
-from app.models import ApplicationEvent, JobPosting, Resume
-from app.routers._common import ResumeContentForm, load_resume_and_job
+from app.models import JobPosting, Resume
+from app.routers._common import ResumeContentForm, list_all, load_resume_and_job
+from app.services import application_log
 from app.services.activity_report import build_activity_report
 from app.services.interview_prep import build_interview_prep
 from app.services.job_fit_coach import build_coaching
@@ -27,7 +28,7 @@ def dashboard(
     axes: int = 0,
     db: Session = Depends(get_db),
 ):
-    resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
+    resumes = list_all(db, Resume)
     query = select(JobPosting).order_by(JobPosting.created_at.desc())
     if position:
         query = query.where(JobPosting.position == position)
@@ -66,10 +67,8 @@ def dashboard(
 
 @router.get("/activity")
 def activity(request: Request, db: Session = Depends(get_db)):
-    jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
-    interview_events = list(
-        db.scalars(select(ApplicationEvent).where(ApplicationEvent.kind == "interview"))
-    )
+    jobs = list_all(db, JobPosting)
+    interview_events = application_log.all_interview_events(db)
     return templates.TemplateResponse(
         request,
         "activity.html",
@@ -82,12 +81,11 @@ def activity(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/profile")
 def profile(request: Request, resume_id: int = 0, db: Session = Depends(get_db)):
-    resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
+    resumes = list_all(db, Resume)
     selected_resume = db.get(Resume, resume_id) if resume_id else None
     bundle = None
     if selected_resume:
-        all_jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
-        demand = [rank.name for rank in skill_ranking(all_jobs)]
+        demand = [rank.name for rank in skill_ranking(list_all(db, JobPosting))]
         bundle = build_platform_profiles(selected_resume, skill_demand=demand)
     return templates.TemplateResponse(
         request,

@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.constants import (
@@ -11,10 +10,16 @@ from app.constants import (
 )
 from app.db import get_db
 from app.models import JobPosting, Resume
-from app.routers._common import ResumeContentForm, get_or_404
+from app.routers._common import (
+    LABEL_REQUIRED_MESSAGE,
+    ResumeContentForm,
+    get_or_404,
+    list_all,
+    load_resume,
+)
 from app.services.job_parser import guess_position_code
 from app.services.profile_exporter import guess_total_years
-from app.services.resume_editor import apply_resume_content, new_resume, validate_resume_content
+from app.services.resume_editor import apply_resume_content, new_resume
 from app.services.resume_parser import extract_text_from_upload
 from app.services.resume_reviewer import review_resume
 from app.services.resume_sections import detect_sections
@@ -23,7 +28,14 @@ from app.templates import templates
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
-_RESUME_REQUIRED_FIELD_MESSAGES = {"label": "이력서 이름을 입력해주세요."}
+
+def _render_resume_form(request, template, *, errors, values, resume=None, active_tab=None):
+    ctx = {"errors": errors, "values": values}
+    if resume is not None:
+        ctx["resume"] = resume
+    if active_tab:
+        ctx["active_tab"] = active_tab
+    return templates.TemplateResponse(request, template, ctx, status_code=422)
 
 
 @router.get("/new")
@@ -38,7 +50,7 @@ async def upload_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    errors = require_fields({"label": label}, _RESUME_REQUIRED_FIELD_MESSAGES)
+    errors = require_fields({"label": label}, LABEL_REQUIRED_MESSAGE)
     content = await file.read()
     raw_text = ""
     if len(content) > MAX_UPLOAD_BYTES:
@@ -53,11 +65,9 @@ async def upload_resume(
                 errors["file"] = UPLOAD_NO_TEXT_MESSAGE
 
     if errors:
-        return templates.TemplateResponse(
-            request,
-            "resume_new.html",
-            {"errors": errors, "values": {"label": label}, "active_tab": "file-tab"},
-            status_code=422,
+        return _render_resume_form(
+            request, "resume_new.html",
+            errors=errors, values={"label": label}, active_tab="file-tab",
         )
 
     resume = new_resume(
@@ -80,14 +90,11 @@ def submit_resume_form(
     form: ResumeContentForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    errors = require_fields({"label": form.label}, _RESUME_REQUIRED_FIELD_MESSAGES)
-    errors.update(validate_resume_content("form", **form.content_kwargs()))
+    errors = form.validation_errors("form")
     if errors:
-        return templates.TemplateResponse(
-            request,
-            "resume_new.html",
-            {"errors": errors, "values": form.error_values(), "active_tab": "form-tab"},
-            status_code=422,
+        return _render_resume_form(
+            request, "resume_new.html",
+            errors=errors, values=form.error_values(), active_tab="form-tab",
         )
 
     resume = new_resume(label=form.label, source_type="form", **form.content_kwargs())
@@ -99,8 +106,9 @@ def submit_resume_form(
 
 @router.get("")
 def list_resumes(request: Request, db: Session = Depends(get_db)):
-    resumes = list(db.scalars(select(Resume).order_by(Resume.created_at.desc())))
-    return templates.TemplateResponse(request, "resumes_list.html", {"resumes": resumes})
+    return templates.TemplateResponse(
+        request, "resumes_list.html", {"resumes": list_all(db, Resume)}
+    )
 
 
 @router.get("/{resume_id}")
@@ -109,11 +117,10 @@ def resume_detail(resume_id: int, request: Request, db: Session = Depends(get_db
     suggestions = review_resume(
         resume.raw_text, len(resume.extracted_skills or []), sections=detect_sections(resume)
     )
-    jobs = list(db.scalars(select(JobPosting).order_by(JobPosting.created_at.desc())))
     return templates.TemplateResponse(
         request,
         "resume_detail.html",
-        {"resume": resume, "suggestions": suggestions, "jobs": jobs},
+        {"resume": resume, "suggestions": suggestions, "jobs": list_all(db, JobPosting)},
     )
 
 
@@ -132,14 +139,11 @@ def update_resume(
 ):
     resume = get_or_404(db, Resume, resume_id, RESUME_NOT_FOUND_DETAIL)
 
-    errors = require_fields({"label": form.label}, _RESUME_REQUIRED_FIELD_MESSAGES)
-    errors.update(validate_resume_content(resume.source_type, **form.content_kwargs()))
+    errors = form.validation_errors(resume.source_type)
     if errors:
-        return templates.TemplateResponse(
-            request,
-            "resume_edit.html",
-            {"resume": resume, "errors": errors, "values": form.error_values()},
-            status_code=422,
+        return _render_resume_form(
+            request, "resume_edit.html",
+            errors=errors, values=form.error_values(), resume=resume,
         )
 
     resume.label = form.label
@@ -150,9 +154,9 @@ def update_resume(
 
 @router.post("/{resume_id}/delete")
 def delete_resume(resume_id: int, db: Session = Depends(get_db)):
-    resume = db.get(Resume, resume_id)
-    if resume is None:
-        return RedirectResponse(url="/resumes?msg=resume_not_found", status_code=303)
+    resume, redirect = load_resume(db, resume_id)
+    if redirect:
+        return redirect
     db.delete(resume)
     db.commit()
     return RedirectResponse(url="/resumes?msg=resume_deleted", status_code=303)

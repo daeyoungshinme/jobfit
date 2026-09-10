@@ -9,34 +9,87 @@ from app.services import job_parser
 
 from .conftest import make_memory_engine
 
+# Pre-migration ("v1") DDL for the tables these tests exercise, kept in ONE
+# place. The migration tests must start from a schema that predates the columns
+# _migrate_table_columns adds, so they can't use Base.metadata.create_all
+# (which builds today's schema). Copy-pasting CREATE TABLE per test lets a
+# column added to models.py without a matching _JOB_POSTING_NEW_COLUMNS /
+# _RESUME_NEW_COLUMNS entry drift by silently; defining it once surfaces it.
+_LEGACY_DDL = {
+    "job_postings": """
+        CREATE TABLE job_postings (
+            id INTEGER PRIMARY KEY,
+            title VARCHAR(200),
+            company VARCHAR(200) DEFAULT '',
+            url VARCHAR(500) DEFAULT '',
+            position VARCHAR(100),
+            experience_level VARCHAR(50) DEFAULT '',
+            raw_text TEXT,
+            required_skills JSON,
+            preferred_skills JSON,
+            created_at DATETIME
+        )
+    """,
+    "resumes": """
+        CREATE TABLE resumes (
+            id INTEGER PRIMARY KEY,
+            label VARCHAR(200),
+            source_type VARCHAR(20),
+            raw_text TEXT,
+            structured JSON,
+            extracted_skills JSON,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+    """,
+}
 
-def _make_isolated_engine():
+
+def _legacy_engine(*tables):
+    """In-memory engine with the named tables at their pre-migration schema.
+    Defaults to ('job_postings',)."""
     engine = make_memory_engine()
     with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                CREATE TABLE job_postings (
-                    id INTEGER PRIMARY KEY,
-                    title VARCHAR(200),
-                    company VARCHAR(200) DEFAULT '',
-                    url VARCHAR(500) DEFAULT '',
-                    position VARCHAR(100),
-                    experience_level VARCHAR(50) DEFAULT '',
-                    raw_text TEXT,
-                    required_skills JSON,
-                    preferred_skills JSON,
-                    created_at DATETIME
-                )
-                """
-            )
-        )
+        for table in tables or ("job_postings",):
+            conn.execute(text(_LEGACY_DDL[table]))
     return engine
 
 
-def test_migrate_table_columns_adds_missing_columns_and_is_idempotent(monkeypatch):
-    engine = _make_isolated_engine()
+def _use_legacy_db(monkeypatch, *tables):
+    """_legacy_engine + repoint app.db.engine / SessionLocal at it — the
+    monkeypatch dance every migration test otherwise repeats."""
+    engine = _legacy_engine(*tables)
     monkeypatch.setattr(db_module, "engine", engine)
+    monkeypatch.setattr(
+        db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    )
+    return engine
+
+
+def test_legacy_ddl_plus_migrations_reconstructs_todays_schema():
+    """The v1 DDL above + the columns _migrate_table_columns adds must equal
+    today's model schema. A column added to models.py without a matching
+    _JOB_POSTING_NEW_COLUMNS / _RESUME_NEW_COLUMNS entry fails here instead of
+    leaving already-migrated databases missing the column."""
+    from sqlalchemy import create_engine
+
+    from app.models import JobPosting, Resume
+
+    for model, new_columns, ddl in (
+        (JobPosting, migrations._JOB_POSTING_NEW_COLUMNS, _LEGACY_DDL["job_postings"]),
+        (Resume, migrations._RESUME_NEW_COLUMNS, _LEGACY_DDL["resumes"]),
+    ):
+        legacy = create_engine("sqlite://")
+        with legacy.begin() as conn:
+            conn.execute(text(ddl))
+            legacy_cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({model.__tablename__})"))}
+        migrated = legacy_cols | {name for name, _ddl, _default in new_columns}
+        model_cols = set(model.__table__.columns.keys())
+        assert model_cols <= migrated, f"{model.__tablename__}: {model_cols - migrated} not covered by migrations"
+
+
+def test_migrate_table_columns_adds_missing_columns_and_is_idempotent(monkeypatch):
+    engine = _use_legacy_db(monkeypatch)
 
     migrations._migrate_table_columns("job_postings", migrations._JOB_POSTING_NEW_COLUMNS)
 
@@ -54,10 +107,8 @@ def test_migrate_table_columns_adds_missing_columns_and_is_idempotent(monkeypatc
 
 
 def test_migrate_resumes_adds_career_columns_with_typed_defaults(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch, "resumes")
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE resumes (id INTEGER PRIMARY KEY, label VARCHAR(200))"))
         conn.execute(text("INSERT INTO resumes (label) VALUES ('기존 이력서')"))
 
     migrations._migrate_table_columns("resumes", migrations._RESUME_NEW_COLUMNS)
@@ -77,8 +128,7 @@ def test_migrate_resumes_adds_career_columns_with_typed_defaults(monkeypatch):
 
 
 def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
 
     with engine.begin() as conn:
         conn.execute(
@@ -96,8 +146,7 @@ def test_migrate_backfills_status_default_on_existing_rows(monkeypatch):
 
 
 def test_migrate_adds_application_columns_with_typed_defaults(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
 
     with engine.begin() as conn:
         conn.execute(
@@ -124,12 +173,8 @@ def test_migrate_adds_application_columns_with_typed_defaults(monkeypatch):
 
 
 def test_reparse_fills_empty_rows_and_is_idempotent(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
     migrations._migrate_table_columns("job_postings", migrations._JOB_POSTING_NEW_COLUMNS)
-
-    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    monkeypatch.setattr(db_module, "SessionLocal", TestingSessionLocal)
 
     with engine.begin() as conn:
         conn.execute(
@@ -165,10 +210,8 @@ def test_reparse_fills_empty_rows_and_is_idempotent(monkeypatch):
 
 
 def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplog):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
     migrations._migrate_table_columns("job_postings", migrations._JOB_POSTING_NEW_COLUMNS)
-    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
 
     with engine.begin() as conn:
         conn.execute(
@@ -196,10 +239,8 @@ def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplo
 
 
 def test_reparse_reparses_sections_and_guesses_extras(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
     migrations._migrate_table_columns("job_postings", migrations._JOB_POSTING_NEW_COLUMNS)
-    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
 
     from app.models import JobPosting
 
@@ -226,18 +267,8 @@ def test_reparse_reparses_sections_and_guesses_extras(monkeypatch):
 
 
 def test_backfill_resume_career_guesses_years_and_position(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                "CREATE TABLE resumes (id INTEGER PRIMARY KEY, label VARCHAR(200), "
-                "source_type VARCHAR(20), raw_text TEXT, structured JSON, extracted_skills JSON, "
-                "created_at DATETIME, updated_at DATETIME)"
-            )
-        )
+    engine = _use_legacy_db(monkeypatch, "resumes")
     migrations._migrate_table_columns("resumes", migrations._RESUME_NEW_COLUMNS)
-    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
 
     from app.models import Resume
 
@@ -266,8 +297,7 @@ def test_backfill_resume_career_guesses_years_and_position(monkeypatch):
 
 
 def test_backfill_updated_at_seeds_from_created_at(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
 
     with engine.begin() as conn:
         conn.execute(
@@ -293,10 +323,8 @@ def test_backfill_updated_at_seeds_from_created_at(monkeypatch):
 
 
 def test_reparse_sets_sections_detected(monkeypatch):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
     migrations._migrate_table_columns("job_postings", migrations._JOB_POSTING_NEW_COLUMNS)
-    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
 
     from app.models import JobPosting
 
@@ -321,10 +349,8 @@ def test_reparse_sets_sections_detected(monkeypatch):
 
 
 def test_backfill_isolates_a_failing_row_and_logs_it(monkeypatch, caplog):
-    engine = _make_isolated_engine()
-    monkeypatch.setattr(db_module, "engine", engine)
+    engine = _use_legacy_db(monkeypatch)
     migrations._migrate_table_columns("job_postings", migrations._JOB_POSTING_NEW_COLUMNS)
-    monkeypatch.setattr(db_module, "SessionLocal", sessionmaker(bind=engine, autoflush=False, autocommit=False))
 
     with engine.begin() as conn:
         conn.execute(

@@ -41,6 +41,18 @@ def test_dashboard_with_unknown_resume_id_shows_no_matches(client):
     assert response.status_code == 200
 
 
+def test_dashboard_axes_1_folds_experience_into_score(client, job_factory, resume_factory):
+    job_factory(required_skills=["Python"], experience_level="y5_10")
+    resume = resume_factory(raw_text="Python 백엔드 1년", extracted_skills=["Python"], total_years=1)
+
+    baseline = client.get("/analysis/dashboard", params={"resume_id": resume.id})
+    with_axes = client.get("/analysis/dashboard", params={"resume_id": resume.id, "axes": 1})
+
+    assert with_axes.status_code == 200
+    assert "경력 적합도를 점수에 반영 중" in with_axes.text
+    assert "경력 적합도를 점수에 반영 중" not in baseline.text
+
+
 def test_activity_page_renders(client, job_factory):
     job_factory(status="applied", applied_via="linkedin", applied_at="2026-08-01")
     job_factory(is_inbound=True, status="interest")

@@ -13,6 +13,18 @@ def test_tailor_redirects_without_job(client, resume_factory):
     assert response.headers["location"] == "/jobs?msg=job_not_found"
 
 
+def test_tailor_post_with_unknown_resume_redirects(client, job_factory):
+    job = job_factory()
+    response = client.post(
+        "/analysis/tailor",
+        params={"resume_id": 99999, "job_id": job.id},
+        data={"career": "x"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/resumes?msg=resume_not_found"
+
+
 def test_tailor_get_shows_job_requirements_and_resume_fields(client, job_factory, resume_factory):
     job = job_factory()
     resume = resume_factory()

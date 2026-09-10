@@ -43,6 +43,21 @@ def client(db_session):
 
 
 @pytest.fixture()
+def lenient_client(db_session):
+    """Like `client`, but returns 5xx responses instead of re-raising — for
+    exercising app/main.py's exception handlers. Keeps the same in-memory
+    get_db override so a DB-touching route still can't reach the real db."""
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        yield TestClient(app, raise_server_exceptions=False)
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture()
 def make_job():
     """비영속 JobPosting 빌더 — compute_match 등 순수 서비스 함수 테스트용 (DB 불필요)."""
     def _make(id, title, required, preferred, position="backend"):

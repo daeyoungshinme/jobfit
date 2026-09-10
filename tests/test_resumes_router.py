@@ -38,6 +38,50 @@ def test_upload_resume_with_no_extractable_text_returns_422(client, db_session):
     assert db_session.query(Resume).count() == 0
 
 
+def test_upload_resume_oversized_file_returns_422(client, db_session):
+    big = b"x" * (10 * 1024 * 1024 + 1)
+    response = client.post(
+        "/resumes/upload",
+        data={"label": "큰 파일"},
+        files={"file": ("resume.txt", big, "text/plain")},
+    )
+    assert response.status_code == 422
+    assert "너무 큽니다" in response.text
+    assert db_session.query(Resume).count() == 0
+
+
+def test_upload_resume_unsupported_extension_returns_422(client, db_session):
+    response = client.post(
+        "/resumes/upload",
+        data={"label": "한글 파일"},
+        files={"file": ("resume.hwp", b"binary", "application/octet-stream")},
+    )
+    assert response.status_code == 422
+    assert "지원하지 않는 파일 형식" in response.text
+    assert db_session.query(Resume).count() == 0
+
+
+def test_upload_resume_stamps_career_meta(client, db_session):
+    client.post(
+        "/resumes/upload",
+        data={"label": "백엔드 이력서"},
+        files={"file": ("resume.txt", "[경력]\n7년차 백엔드 개발자, Python".encode("utf-8"), "text/plain")},
+        follow_redirects=False,
+    )
+    resume = db_session.query(Resume).one()
+    assert resume.total_years == 7
+    assert resume.target_position == "backend"
+
+
+def test_resume_detail_renders_review_checklist(client, resume_factory):
+    resume = resume_factory(raw_text="짧은 이력서", extracted_skills=[])
+    response = client.get(f"/resumes/{resume.id}")
+    assert response.status_code == 200
+    assert resume.label in response.text
+    # review_resume() 결과가 실제로 렌더된다 — 5자짜리 원문이면 "분량이 짧습니다" 경고.
+    assert "이력서 분량이 짧습니다" in response.text
+
+
 def test_submit_resume_form_missing_label_returns_422(client):
     response = client.post("/resumes/form", data={"label": "", "career": "3년차 백엔드 개발자"})
     assert response.status_code == 422

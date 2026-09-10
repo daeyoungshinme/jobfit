@@ -9,6 +9,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app import db as db_module
+from app import migrations
 
 
 def _use_temp_db(monkeypatch, tmp_path):
@@ -33,7 +34,7 @@ def test_init_db_creates_schema_and_is_repeatable(monkeypatch, tmp_path):
             text("SELECT value FROM schema_meta WHERE key = 'job_postings_reparsed_v2'")
         ).scalar_one()
 
-    for column, _ddl, _default in db_module._JOB_POSTING_NEW_COLUMNS:
+    for column, _ddl, _default in migrations._JOB_POSTING_NEW_COLUMNS:
         assert column in job_columns
     assert backfill_flag == "done"
 

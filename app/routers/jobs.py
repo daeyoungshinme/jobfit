@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.constants import (
     JOB_NOT_FOUND_DETAIL,
-    JOB_STATUS_INVALID_DETAIL,
     MAX_RAW_TEXT_CHARS,
     MAX_RAW_TEXT_MESSAGE,
     MAX_UPLOAD_BYTES,
@@ -27,33 +26,17 @@ from app.models import JobPosting, Resume
 from app.routers._common import get_or_404, load_job, normalize_job_status
 from app.services import application_log
 from app.services.dates import is_iso_date
-from app.services.job_parser import (
-    apply_parsed_sections,
-    guess_posting_fields,
-    guess_source_site,
-    normalize_newlines,
-    parse_job_posting,
+from app.services.job_editor import (
+    apply_job_content,
+    new_job,
+    suggest_apply_channel,
+    validate_job_content,
 )
+from app.services.job_parser import guess_posting_fields, guess_source_site, normalize_newlines, parse_job_posting
 from app.services.ocr import extract_text_from_image
-from app.services.validation import require_fields
 from app.templates import templates
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-
-def _suggested_channel(source_site: str) -> str:
-    """자유 입력 source_site 문자열에서 지원 채널 코드를 추천한다 (없으면 "")."""
-    site = (source_site or "").lower()
-    for member in APPLY_CHANNEL:
-        if any(key.lower() in site for key in member.meta.get("source_site_keys", ())):
-            return member.code
-    return ""
-
-_JOB_REQUIRED_FIELD_MESSAGES = {
-    "title": "공고 제목을 입력해주세요.",
-    "position": "직무를 선택해주세요.",
-    "raw_text": "공고 원문을 입력해주세요.",
-}
 
 _JOB_FORM_FIELDS = (
     "title", "company", "address", "url", "source_site",
@@ -63,10 +46,10 @@ _JOB_FORM_FIELDS = (
 
 
 class JobForm:
-    """The job create/edit form's 10 fields as a single FastAPI dependency.
+    """The job create/edit form's fields as a single FastAPI dependency.
 
-    Spelled out once here instead of repeated as Form(...) params in both
-    create_job and update_job plus an error-render values dict.
+    Binds and enum-normalizes the raw request fields; domain validation and the
+    write path live in app/services/job_editor.py.
     """
 
     def __init__(
@@ -108,44 +91,7 @@ class JobForm:
         return {name: getattr(self, name) for name in _JOB_FORM_FIELDS}
 
     def validation_errors(self) -> dict:
-        errors = require_fields(
-            {"title": self.title, "position": self.position, "raw_text": self.raw_text},
-            _JOB_REQUIRED_FIELD_MESSAGES,
-        )
-        # 비어 있으면 OK (_persist_job 가 기본값으로 채움). 값이 있는데 알려진
-        # 코드가 아니면 조작됐거나 오래된 폼에서 온 POST 다.
-        if self.position and not POSITION.has(self.position):
-            errors["position"] = "알 수 없는 직무입니다."
-        if self.status and not JOB_STATUS.has(self.status):
-            errors["status"] = JOB_STATUS_INVALID_DETAIL
-        # preview 는 초과 시 400 을 주는데 저장 경로는 캡 없이 넣고 있었다 —
-        # 파서 입력만 잘리고 raw_text 컬럼엔 초과분이 그대로 저장되던 불일치.
-        if len(self.raw_text) > MAX_RAW_TEXT_CHARS:
-            errors["raw_text"] = MAX_RAW_TEXT_MESSAGE
-        return errors
-
-
-def _persist_job(job: JobPosting, form: JobForm) -> None:
-    """Write validated form fields + re-parsed sections onto `job`. Caller commits."""
-    raw_text = normalize_newlines(form.raw_text)
-    # 폼 값이 있으면 그대로, 없으면 원문에서 추측 (source_site 와 같은 패턴 —
-    # no-JS 사용자도 최소한의 자동 채움을 받도록).
-    guessed = guess_posting_fields(raw_text)
-    job.title = form.title
-    job.company = form.company or guessed.company
-    job.address = form.address or guessed.address
-    job.url = form.url
-    job.source_site = form.source_site.strip() or guess_source_site(form.url)
-    job.position = form.position
-    job.experience_level = form.experience_level
-    job.status = form.status or JOB_STATUS_DEFAULT
-    job.is_inbound = form.is_inbound
-    job.raw_text = raw_text
-    apply_parsed_sections(job, parse_job_posting(raw_text))
-    job.employment_type = form.employment_type or guessed.employment_type
-    job.remote_policy = form.remote_policy or guessed.remote_policy
-    job.salary_text = form.salary_text or guessed.salary_text
-    job.deadline = form.deadline or guessed.deadline
+        return validate_job_content(**self.as_dict())
 
 
 def _render_job_form(request: Request, template: str, form: JobForm, errors: dict, job=None):
@@ -207,8 +153,7 @@ def create_job(request: Request, form: JobForm = Depends(), db: Session = Depend
     if errors:
         return _render_job_form(request, "job_new.html", form, errors)
 
-    job = JobPosting()
-    _persist_job(job, form)
+    job = new_job(**form.as_dict())
     db.add(job)
     db.commit()
     db.refresh(job)
@@ -303,7 +248,7 @@ def job_detail(job_id: int, request: Request, db: Session = Depends(get_db)):
             "job": job,
             "sections_detected": job.sections_detected,
             "resumes": resumes,
-            "suggested_channel": _suggested_channel(job.source_site),
+            "suggested_channel": suggest_apply_channel(job.source_site),
             "applied_resume": applied_resume,
             "timeline_entries": application_log.timeline(application_log.events_for_job(db, job_id)),
         },
@@ -325,7 +270,7 @@ def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Ses
         return _render_job_form(request, "job_edit.html", form, errors, job=job)
 
     application_log.record_status_change(db, job, form.status or JOB_STATUS_DEFAULT)
-    _persist_job(job, form)
+    apply_job_content(job, **form.as_dict())
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_updated", status_code=303)
 

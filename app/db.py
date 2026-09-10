@@ -12,11 +12,10 @@ DB_PATH = Path(__file__).resolve().parent.parent / "jobfit.db"
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-# Bumped whenever a data migration step is added to _run_data_migrations().
-# Stored in schema_meta so a fresh/older DB can tell which one-off migrations
-# it still needs. Column additions themselves stay idempotent via
-# _migrate_table_columns and don't need a version bump.
-SCHEMA_VERSION = 6
+# Which one-off data migrations a given jobfit.db still needs is tracked
+# entirely by the per-step "done" flags in the schema_meta table (see
+# _run_data_migrations). Column additions are idempotent via
+# _migrate_table_columns and need no flag at all.
 
 # (column, DDL type, default literal) for JobPosting columns added after the
 # table was first created. SQLite has no ALTER-TABLE-based migration tooling
@@ -119,16 +118,22 @@ def _set_meta(key: str, value: str) -> None:
         )
 
 
-def _backfill_job_postings() -> None:
-    """Re-derive the section fields, address, and source_site for postings saved
-    before those columns existed (or left half-filled by an interrupted run).
+def _reparse_all_job_postings() -> None:
+    """Re-parse every posting's raw_text and (re)fill everything the parser and
+    the field guesser derive from it: the section fields + skills, the
+    sections_detected flag, and any still-empty best-effort field
+    (address / source_site / employment_type / remote_policy / deadline /
+    salary_text).
 
-    Runs once (guarded by a schema_meta flag in _run_data_migrations). The
-    query itself is still idempotent (only touches rows with required_text ==
-    ""), so a re-run after a partial failure self-heals. Each row is committed
-    on its own: a single pathological raw_text must not abort startup or drag
-    the rows already parsed back down with it, so failures are rolled back,
-    logged, and skipped — not raised.
+    Consolidates what used to be three separate startup passes
+    (_backfill_job_postings, _backfill_sections_detected, _backfill_job_extras),
+    each of which re-parsed the same raw_text. Runs once, guarded by a
+    schema_meta flag in _run_data_migrations. Parsing is deterministic so a
+    re-run is harmless.
+
+    Each row is committed on its own: a single pathological raw_text must not
+    abort startup or drag the rows already parsed back down with it, so
+    failures are rolled back, logged, and skipped — not raised.
     """
     from sqlalchemy import select
 
@@ -142,41 +147,22 @@ def _backfill_job_postings() -> None:
 
     db = SessionLocal()
     try:
-        pending = list(
-            db.scalars(
-                select(JobPosting.id).where(
-                    JobPosting.required_text == "", JobPosting.raw_text != ""
-                )
-            )
-        )
-        for job_id in pending:
+        ids = list(db.scalars(select(JobPosting.id).where(JobPosting.raw_text != "")))
+        for job_id in ids:
             job = db.get(JobPosting, job_id)
             try:
                 apply_parsed_sections(job, parse_job_posting(job.raw_text))
-                if not job.address:
-                    job.address = guess_posting_fields(job.raw_text).address
+                guessed = guess_posting_fields(job.raw_text)
+                job.address = job.address or guessed.address
+                job.source_site = job.source_site or guess_source_site(job.url)
+                job.employment_type = job.employment_type or guessed.employment_type
+                job.remote_policy = job.remote_policy or guessed.remote_policy
+                job.deadline = job.deadline or guessed.deadline
+                job.salary_text = job.salary_text or guessed.salary_text
                 db.commit()
             except Exception:
                 db.rollback()
                 logger.warning("job_posting %s 백필 실패 — 건너뜁니다", job_id, exc_info=True)
-
-        stale_sites = list(
-            db.scalars(
-                select(JobPosting.id).where(
-                    JobPosting.source_site == "", JobPosting.url != ""
-                )
-            )
-        )
-        for job_id in stale_sites:
-            job = db.get(JobPosting, job_id)
-            try:
-                job.source_site = guess_source_site(job.url)
-                db.commit()
-            except Exception:
-                db.rollback()
-                logger.warning(
-                    "job_posting %s source_site 추측 실패 — 건너뜁니다", job_id, exc_info=True
-                )
     finally:
         db.close()
 
@@ -218,31 +204,6 @@ def _migrate_enum_codes() -> None:
         db.close()
 
 
-def _backfill_sections_detected() -> None:
-    """Fill the sections_detected flag for postings saved before that column
-    existed. Row-isolated like _backfill_job_postings."""
-    from sqlalchemy import select
-
-    from app.models import JobPosting
-    from app.services.job_parser import parse_job_posting
-
-    db = SessionLocal()
-    try:
-        ids = list(db.scalars(select(JobPosting.id).where(JobPosting.raw_text != "")))
-        for job_id in ids:
-            job = db.get(JobPosting, job_id)
-            try:
-                job.sections_detected = parse_job_posting(job.raw_text).sections_detected
-                db.commit()
-            except Exception:
-                db.rollback()
-                logger.warning(
-                    "job_posting %s sections_detected 백필 실패 — 건너뜁니다", job_id, exc_info=True
-                )
-    finally:
-        db.close()
-
-
 def _backfill_updated_at() -> None:
     """New job_postings.updated_at rows land as NULL (SQLite ALTER limitation);
     seed them from created_at so existing postings aren't all "never updated"."""
@@ -250,41 +211,6 @@ def _backfill_updated_at() -> None:
         conn.execute(
             text("UPDATE job_postings SET updated_at = created_at WHERE updated_at IS NULL")
         )
-
-
-def _backfill_job_extras() -> None:
-    """Re-parse raw_text to fill benefits/process sections and guess the new
-    employment_type / remote_policy / deadline / salary fields for postings
-    saved before those columns existed. Row-isolated."""
-    from sqlalchemy import select
-
-    from app.models import JobPosting
-    from app.services.job_parser import (
-        apply_parsed_sections,
-        guess_posting_fields,
-        parse_job_posting,
-    )
-
-    db = SessionLocal()
-    try:
-        ids = list(db.scalars(select(JobPosting.id).where(JobPosting.raw_text != "")))
-        for job_id in ids:
-            job = db.get(JobPosting, job_id)
-            try:
-                apply_parsed_sections(job, parse_job_posting(job.raw_text))
-                guessed = guess_posting_fields(job.raw_text)
-                job.employment_type = job.employment_type or guessed.employment_type
-                job.remote_policy = job.remote_policy or guessed.remote_policy
-                job.deadline = job.deadline or guessed.deadline
-                job.salary_text = job.salary_text or guessed.salary_text
-                db.commit()
-            except Exception:
-                db.rollback()
-                logger.warning(
-                    "job_posting %s 부가정보 백필 실패 — 건너뜁니다", job_id, exc_info=True
-                )
-    finally:
-        db.close()
 
 
 def _backfill_resume_career() -> None:
@@ -318,22 +244,20 @@ def _backfill_resume_career() -> None:
 
 def _run_data_migrations() -> None:
     """One-off data migrations, each guarded by its own schema_meta flag so it
-    runs exactly once per database. Add new steps here and bump SCHEMA_VERSION."""
+    runs exactly once per database. Add a new step as another
+    `if _get_meta(...) != "done": ...; _set_meta(...)` block."""
     if _get_meta("enum_codes_migrated") != "done":
         _migrate_enum_codes()
         _set_meta("enum_codes_migrated", "done")
-    if _get_meta("job_postings_backfilled") != "done":
-        _backfill_job_postings()
-        _set_meta("job_postings_backfilled", "done")
-    if _get_meta("sections_detected_backfilled") != "done":
-        _backfill_sections_detected()
-        _set_meta("sections_detected_backfilled", "done")
+    # v2 replaces three older passes (job_postings_backfilled /
+    # sections_detected_backfilled / job_extras_backfilled) that each re-parsed
+    # raw_text; a DB carrying those old flags simply re-parses once more here.
+    if _get_meta("job_postings_reparsed_v2") != "done":
+        _reparse_all_job_postings()
+        _set_meta("job_postings_reparsed_v2", "done")
     if _get_meta("job_updated_at_backfilled") != "done":
         _backfill_updated_at()
         _set_meta("job_updated_at_backfilled", "done")
-    if _get_meta("job_extras_backfilled") != "done":
-        _backfill_job_extras()
-        _set_meta("job_extras_backfilled", "done")
     if _get_meta("resume_career_backfilled") != "done":
         _backfill_resume_career()
         _set_meta("resume_career_backfilled", "done")
@@ -347,4 +271,3 @@ def init_db():
     _migrate_table_columns("job_postings", _JOB_POSTING_NEW_COLUMNS)
     _migrate_table_columns("resumes", _RESUME_NEW_COLUMNS)
     _run_data_migrations()
-    _set_meta("schema_version", str(SCHEMA_VERSION))

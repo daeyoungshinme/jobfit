@@ -122,7 +122,7 @@ def test_migrate_adds_application_columns_with_typed_defaults(monkeypatch):
     assert not row[4]   # is_inbound defaults falsy
 
 
-def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
+def test_reparse_fills_empty_rows_and_is_idempotent(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)
     db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
@@ -146,7 +146,7 @@ def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
             )
         )
 
-    db_module._backfill_job_postings()
+    db_module._reparse_all_job_postings()
 
     with engine.connect() as conn:
         row = conn.execute(
@@ -156,7 +156,7 @@ def test_backfill_job_postings_fills_empty_rows_and_is_idempotent(monkeypatch):
     assert "Python" in row[2]  # skills re-extracted, not left as the stale '[]'
     filled_required_text = row[0]
 
-    db_module._backfill_job_postings()
+    db_module._reparse_all_job_postings()
 
     with engine.connect() as conn:
         row_again = conn.execute(text("SELECT required_text FROM job_postings")).one()
@@ -194,7 +194,7 @@ def test_migrate_enum_codes_converts_labels_and_leaves_ranges(monkeypatch, caplo
     assert any("2~8년" in r.message for r in caplog.records)  # 미상 값 로깅
 
 
-def test_backfill_job_extras_reparses_and_guesses(monkeypatch):
+def test_reparse_reparses_sections_and_guesses_extras(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)
     db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
@@ -213,7 +213,7 @@ def test_backfill_job_extras_reparses_and_guesses(monkeypatch):
     finally:
         s.close()
 
-    db_module._backfill_job_extras()
+    db_module._reparse_all_job_postings()
 
     with engine.connect() as conn:
         row = conn.execute(
@@ -291,7 +291,7 @@ def test_backfill_updated_at_seeds_from_created_at(monkeypatch):
         assert conn.execute(text("SELECT updated_at FROM job_postings")).scalar_one() == created
 
 
-def test_backfill_sections_detected(monkeypatch):
+def test_reparse_sets_sections_detected(monkeypatch):
     engine = _make_isolated_engine()
     monkeypatch.setattr(db_module, "engine", engine)
     db_module._migrate_table_columns("job_postings", db_module._JOB_POSTING_NEW_COLUMNS)
@@ -311,7 +311,7 @@ def test_backfill_sections_detected(monkeypatch):
     finally:
         s.close()
 
-    db_module._backfill_sections_detected()
+    db_module._reparse_all_job_postings()
 
     with engine.connect() as conn:
         rows = dict(conn.execute(text("SELECT title, sections_detected FROM job_postings")).all())
@@ -345,7 +345,7 @@ def test_backfill_isolates_a_failing_row_and_logs_it(monkeypatch, caplog):
     monkeypatch.setattr(job_parser, "parse_job_posting", flaky_parse)
 
     with caplog.at_level(logging.WARNING, logger="jobfit.db"):
-        db_module._backfill_job_postings()  # 예외를 밖으로 던지지 않는다
+        db_module._reparse_all_job_postings()  # 예외를 밖으로 던지지 않는다
 
     with engine.connect() as conn:
         rows = dict(conn.execute(text("SELECT title, required_text FROM job_postings")).all())

@@ -29,14 +29,12 @@ def test_init_db_creates_schema_and_is_repeatable(monkeypatch, tmp_path):
 
     with engine.connect() as conn:
         job_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(job_postings)"))}
-        version = conn.execute(text("SELECT value FROM schema_meta WHERE key = 'schema_version'")).scalar_one()
         backfill_flag = conn.execute(
-            text("SELECT value FROM schema_meta WHERE key = 'job_postings_backfilled'")
+            text("SELECT value FROM schema_meta WHERE key = 'job_postings_reparsed_v2'")
         ).scalar_one()
 
     for column, _ddl, _default in db_module._JOB_POSTING_NEW_COLUMNS:
         assert column in job_columns
-    assert version == str(db_module.SCHEMA_VERSION)
     assert backfill_flag == "done"
 
     with engine.connect() as conn:
@@ -67,8 +65,8 @@ def test_init_db_backfill_runs_once(monkeypatch, tmp_path):
     finally:
         session.close()
 
-    db_module.init_db()  # 플래그가 이미 있으므로 백필이 다시 돌지 않는다
+    db_module.init_db()  # 플래그가 이미 있으므로 재파싱이 다시 돌지 않는다
 
     with engine.connect() as conn:
         required_text = conn.execute(text("SELECT required_text FROM job_postings")).scalar_one()
-    assert required_text == ""  # 백필이 재실행됐다면 채워졌을 것
+    assert required_text == ""  # 재파싱이 재실행됐다면 채워졌을 것

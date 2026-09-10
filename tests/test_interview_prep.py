@@ -125,18 +125,6 @@ def test_question_count_and_group_order_and_topic_sorting():
     assert ranks == sorted(ranks)
 
 
-def test_behavioral_bucket_from_experience_code_and_range():
-    from app.services.interview_prep import _experience_bucket
-
-    assert _experience_bucket("entry") == "신입"
-    assert _experience_bucket("y5_10") == "경력"
-    assert _experience_bucket("신입") == "신입"       # (구)라벨도 흡수
-    assert _experience_bucket("2~8년") == "경력"      # 자유 입력 범위
-    assert _experience_bucket("0~1년") == "신입"
-    assert _experience_bucket("any") is None
-    assert _experience_bucket("") is None
-
-
 def test_questions_are_deduped_within_group():
     job = make_job(required=["Python"], main_tasks="- 결제 시스템 개발\n- 결제 시스템 개발")
     prep = build_interview_prep(make_resume(skills=["Python"]), job)

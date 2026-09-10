@@ -3,7 +3,7 @@ import re
 from app.constants import RESUME_MIN_ACTION_VERB_HITS, RESUME_MIN_LENGTH, RESUME_MIN_QUANT_HITS
 from app.schemas import CoachingSuggestion
 from app.services.resume_sections import SECTION_DISPLAY_NAMES, detect_sections_from_text
-from app.services.text_utils import QUANT_PATTERN
+from app.services.text_utils import QUANT_PATTERN, strip_edge_decoration
 
 _IMPROVEMENT_WORD_PATTERN = re.compile(r"증가|감소|향상|절감|단축|달성|개선")
 _ACTION_VERBS = ["개발", "설계", "구축", "운영", "리드", "주도", "담당", "최적화", "도입", "분석", "기획", "해결"]
@@ -17,7 +17,7 @@ def extract_achievement_lines(raw_text: str, limit: int = 6) -> list[str]:
     """
     scored: list[tuple[int, int, str]] = []
     for idx, line in enumerate((raw_text or "").splitlines()):
-        text = line.strip(" \t-•·*—")
+        text = strip_edge_decoration(line)
         if len(text) < 8 or (text.startswith("[") and text.endswith("]")):
             continue
         score = (

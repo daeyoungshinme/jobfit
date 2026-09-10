@@ -11,8 +11,8 @@ from datetime import date, datetime, timezone
 
 from app.constants import STALE_AFTER_DAYS
 from app.enums import JOB_STATUS
+from app.services.dates import parse_iso_date
 
-_ADVANCED = JOB_STATUS.codes_where("advanced")
 _APPLIED = JOB_STATUS.codes_where("applied")
 _EARLY_STAGE = JOB_STATUS.codes_where("early")
 _AWAITING = JOB_STATUS.codes_where("awaiting")  # 지원완료(아직 미진행)
@@ -47,21 +47,16 @@ class ActivityReport:
 
 
 def _days_since(iso: str, today: date) -> int | None:
-    try:
-        return (today - date.fromisoformat(iso)).days
-    except ValueError:
-        return None
+    parsed = parse_iso_date(iso)
+    return (today - parsed).days if parsed is not None else None
 
 
 def _next_interview_by_job(interview_events, today: date) -> dict[int, str]:
     """job_id → 가장 가까운 예정(오늘 이후) 면접일 ISO 문자열."""
     best: dict[int, str] = {}
     for event in interview_events or []:
-        try:
-            when = date.fromisoformat(event.event_at)
-        except (ValueError, TypeError):
-            continue
-        if when < today:
+        when = parse_iso_date(event.event_at)
+        if when is None or when < today:
             continue
         current = best.get(event.job_id)
         if current is None or event.event_at < current:

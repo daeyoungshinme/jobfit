@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from app.enums import POSITION
 from app.services.resume_reviewer import extract_achievement_lines
 from app.services.skill_extractor import skill_category_map
-from app.services.text_utils import dedupe, truncate
+from app.services.text_utils import dedupe, strip_edge_decoration, truncate
 
 _YEARS_PATTERN = re.compile(r"(\d{1,2})\s*년(?!제)")  # "3년차" O, "3년제 대학" X
 _MAX_YEARS = 40
@@ -107,7 +107,7 @@ def guess_total_years(text: str) -> int | None:
 
 def _first_nonempty_line(text: str) -> str:
     for line in (text or "").splitlines():
-        stripped = line.strip(" \t-•·*—")
+        stripped = strip_edge_decoration(line)
         if stripped:
             return stripped
     return ""
@@ -184,7 +184,7 @@ def _experience_bullets(facts: _ResumeFacts, cap: int) -> list[str]:
 
     if len(bullets) < 3 and facts.career_text:
         for line in facts.career_text.splitlines():
-            stripped = line.strip(" \t-•·*—")
+            stripped = strip_edge_decoration(line)
             entry = f"- {stripped}"
             if stripped and entry not in bullets:
                 bullets.append(entry)

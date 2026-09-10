@@ -141,7 +141,7 @@ APPLY_CHANNEL = EnumSet([
 ])
 
 
-# 2-C(공고 파싱/모델 확장)에서 사용. 여기서 정의만 해 둔다.
+# 공고 부가 정보(job_parser 추측 + 폼 수정). DB 에 코드 저장, UI 는 라벨.
 EMPLOYMENT_TYPE = EnumSet([
     EnumMember("fulltime", "정규직"),
     EnumMember("contract", "계약직"),

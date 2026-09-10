@@ -9,7 +9,7 @@ form 이력서는 `resume.structured` 를 그대로 신뢰하고, file 이력서
 
 import re
 
-from app.services.text_utils import BULLET_PREFIX, strip_bullet, truncate
+from app.services.text_utils import BULLET_PREFIX, strip_bullet, strip_edge_decoration, truncate
 
 # 헤딩 라인은 (장식 제거 후) 키워드 + 흔한 접미어만으로 이뤄져야 한다 — fullmatch.
 # 내용 문장이 키워드를 품고 있어도("OO대학교 컴퓨터공학 졸업") 헤딩으로 오인하지 않도록.
@@ -124,7 +124,7 @@ def split_blocks(section_text: str) -> list[str]:
 def first_line_label(block: str, limit: int = 60) -> str:
     """블록의 첫 비어있지 않은 줄을 라벨로 (불릿 제거 + 길이 제한)."""
     for line in block.splitlines():
-        text = strip_bullet(line).strip(" \t·-–—:：")
+        text = strip_edge_decoration(strip_bullet(line))
         if text:
             return truncate(text, limit)
     return ""

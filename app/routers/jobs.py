@@ -1,4 +1,3 @@
-import re
 from datetime import date
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
@@ -27,11 +26,7 @@ from app.enums import (
 from app.models import JobPosting, Resume
 from app.routers._common import get_or_404, load_job, normalize_job_status
 from app.services import application_log
-from app.services.application_log import (
-    add_interview_event,
-    delete_events_for_job,
-    record_status_change,
-)
+from app.services.dates import is_iso_date
 from app.services.job_parser import (
     apply_parsed_sections,
     guess_posting_fields,
@@ -44,8 +39,6 @@ from app.services.validation import require_fields
 from app.templates import templates
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _suggested_channel(source_site: str) -> str:
@@ -125,6 +118,10 @@ class JobForm:
             errors["position"] = "알 수 없는 직무입니다."
         if self.status and not JOB_STATUS.has(self.status):
             errors["status"] = JOB_STATUS_INVALID_DETAIL
+        # preview 는 초과 시 400 을 주는데 저장 경로는 캡 없이 넣고 있었다 —
+        # 파서 입력만 잘리고 raw_text 컬럼엔 초과분이 그대로 저장되던 불일치.
+        if len(self.raw_text) > MAX_RAW_TEXT_CHARS:
+            errors["raw_text"] = MAX_RAW_TEXT_MESSAGE
         return errors
 
 
@@ -327,7 +324,7 @@ def update_job(job_id: int, request: Request, form: JobForm = Depends(), db: Ses
     if errors:
         return _render_job_form(request, "job_edit.html", form, errors, job=job)
 
-    record_status_change(db, job, form.status or JOB_STATUS_DEFAULT)
+    application_log.record_status_change(db, job, form.status or JOB_STATUS_DEFAULT)
     _persist_job(job, form)
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_updated", status_code=303)
@@ -341,7 +338,7 @@ def update_job_status(job_id: int, status: str = Form(...), db: Session = Depend
     code = normalize_job_status(status)
     if not code:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
-    record_status_change(db, job, code)
+    application_log.record_status_change(db, job, code)
     job.status = code
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_updated", status_code=303)
@@ -373,11 +370,11 @@ def update_job_application(
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_status_invalid", status_code=303)
     if applied_via and channel_code is None:
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
-    if applied_at and not _ISO_DATE.match(applied_at):
+    if applied_at and not is_iso_date(applied_at):
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
 
     if status_code:
-        record_status_change(db, job, status_code)
+        application_log.record_status_change(db, job, status_code)
         job.status = status_code
     job.applied_via = channel_code or ""
     job.applied_resume_id = applied_resume_id or 0
@@ -402,9 +399,9 @@ def add_job_interview(
     if redirect:
         return redirect
     event_at = event_at.strip()
-    if not _ISO_DATE.match(event_at):
+    if not is_iso_date(event_at):
         return RedirectResponse(url=f"/jobs/{job_id}?msg=job_application_invalid", status_code=303)
-    add_interview_event(db, job_id, event_at, detail.strip())
+    application_log.add_interview_event(db, job_id, event_at, detail.strip())
     db.commit()
     return RedirectResponse(url=f"/jobs/{job_id}?msg=job_interview_added", status_code=303)
 
@@ -414,7 +411,7 @@ def delete_job(job_id: int, db: Session = Depends(get_db)):
     job, redirect = load_job(db, job_id)
     if redirect:
         return redirect
-    delete_events_for_job(db, job_id)
+    application_log.delete_events_for_job(db, job_id)
     db.delete(job)
     db.commit()
     return RedirectResponse(url="/jobs?msg=job_deleted", status_code=303)

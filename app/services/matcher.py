@@ -1,33 +1,41 @@
 import math
-import re
 from collections import Counter
 from dataclasses import dataclass
 
 from app.constants import MATCH_PREFERRED_WEIGHT, MATCH_REQUIRED_WEIGHT
-from app.enums import EXPERIENCE_LEVEL
 from app.models import JobPosting
 from app.schemas import MatchResult, SkillRank
+from app.services.experience import describe_bounds, parse_experience_bounds
 from app.services.skill_extractor import related_skill_map
+
+# --- 튜닝 상수 (한 곳에 모아둔다) --------------------------------------------
+# 필수/우대 축의 가중 (constants.py 에서). 오버라이드된 적 없어 상수로 고정.
+_REQUIRED_WEIGHT = MATCH_REQUIRED_WEIGHT
+_PREFERRED_WEIGHT = MATCH_PREFERRED_WEIGHT
+# 스킬 축 점수: 정확히 보유=1.0, 대체(related) 스킬 보유=이 값, 없음=0.
+RELATED_CREDIT = 0.5
+# 희소성 가중치의 하한 빈도 — 이보다 드문 스킬도 가중치를 더 키우지 않는다.
+SCARCITY_MIN_FRACTION = 0.05
+# experience_fit 계단 함수: 요구 범위 안이면 1.0, ±N년이면 근접치,
+# 그 이상은 년당 감점하되 하한.
+_EXP_NEAR_YEARS = 2      # 이 이내로 벗어나면 "근접"
+_EXP_NEAR_FIT = 0.7      # 근접 시 적합도
+_EXP_FAR_PENALTY = 0.15  # 근접 범위를 넘어서면 초과 1년당 감점
+_EXP_MIN_FIT = 0.2       # 아무리 벗어나도 이 아래로는 안 내림
 
 
 @dataclass(frozen=True)
 class MatchConfig:
-    """매칭 점수 계산 파라미터. DEFAULT_CONFIG 가 현행 동작을 재현한다 —
-    related_credit 만 예외로, 대체 스킬 보유에 부분 점수를 준다.
+    """매칭 점수 계산 파라미터.
 
-    experience_weight 는 기본 0 이라 경력축이 점수에 반영되지 않는다(투명 노출만).
-    라우터가 `?axes=1` 등으로 명시적으로 켤 때만 최종 점수에 섞인다."""
+    experience_weight 만 라우터가 바꾼다 — 기본 0 이라 경력축은 점수에 반영되지
+    않고(투명 노출만), dashboard 가 `?axes=1` 로 켤 때만 최종 점수에 섞인다.
+    필수/우대 가중·related 부분점수는 튜닝 상수(모듈 상단)로 고정."""
 
-    required_weight: float = MATCH_REQUIRED_WEIGHT
-    preferred_weight: float = MATCH_PREFERRED_WEIGHT
-    related_credit: float = 0.5  # 정확히 보유=1.0, 대체 스킬 보유=이 값, 없음=0
-    experience_weight: float = 0.0  # 경력 적합도 축의 최종 점수 반영 비중 (0 = 스킬 점수만)
+    experience_weight: float = 0.0
 
 
 DEFAULT_CONFIG = MatchConfig()
-
-# 희소성 가중치의 하한 빈도 — 이보다 드문 스킬도 가중치를 더 키우지 않는다.
-SCARCITY_MIN_FRACTION = 0.05
 
 
 def scarcity_weights(ranking: list[SkillRank]) -> dict[str, float]:
@@ -81,46 +89,13 @@ def _score_axis(
     return exact, related, missing, (total / denom if denom else 1.0)
 
 
-_EXPERIENCE_RANGE_RE = re.compile(r"(\d{1,2})\s*~\s*(\d{1,2})\s*년")
-_EXPERIENCE_MIN_RE = re.compile(r"(\d{1,2})\s*년\s*(?:이상|~|\+)")
-
-
-def _experience_bounds(job_experience: str) -> tuple[int, int | None] | None:
-    """공고 경력 조건 → (min_years, max_years|None). 축이 적용되지 않으면 None
-    ('무관'·미상·자유 텍스트). 표준 버킷 코드/라벨을 먼저 보고, 아니면
-    '3~5년'·'5년 이상' 같은 자유 입력 문자열을 정규식으로 해석한다."""
-    if not job_experience:
-        return None
-    member = EXPERIENCE_LEVEL.get(EXPERIENCE_LEVEL.normalize(job_experience))
-    if member is not None:
-        if member.meta.get("bucket") is None:  # "무관"
-            return None
-        return member.meta.get("min_years", 0), member.meta.get("max_years")
-    range_match = _EXPERIENCE_RANGE_RE.search(job_experience)
-    if range_match:
-        lo, hi = int(range_match.group(1)), int(range_match.group(2))
-        return (lo, hi) if lo <= hi else (hi, lo)
-    min_match = _EXPERIENCE_MIN_RE.search(job_experience)
-    if min_match:
-        return int(min_match.group(1)), None
-    return None
-
-
-def _describe_bounds(lo: int, hi: int | None) -> str:
-    if hi is None:
-        return f"{lo}년 이상"
-    if lo == hi:
-        return "신입" if lo == 0 else f"{lo}년"
-    return f"{lo}~{hi}년"
-
-
 def experience_fit(total_years: int, job_experience: str) -> tuple[float | None, str]:
     """(적합도 0~1, 설명 문자열). 축이 적용되지 않으면 (None, "")."""
-    bounds = _experience_bounds(job_experience)
+    bounds = parse_experience_bounds(job_experience)
     if bounds is None:
         return None, ""
     lo, hi = bounds
-    detail = f"보유 {total_years}년 · 요구 {_describe_bounds(lo, hi)}"
+    detail = f"보유 {total_years}년 · 요구 {describe_bounds(lo, hi)}"
     if total_years < lo:
         gap = lo - total_years
     elif hi is not None and total_years > hi:
@@ -129,10 +104,10 @@ def experience_fit(total_years: int, job_experience: str) -> tuple[float | None,
         gap = 0
     if gap == 0:
         fit = 1.0
-    elif gap <= 2:
-        fit = 0.7
+    elif gap <= _EXP_NEAR_YEARS:
+        fit = _EXP_NEAR_FIT
     else:
-        fit = max(0.2, round(1.0 - gap * 0.15, 2))
+        fit = max(_EXP_MIN_FIT, round(1.0 - gap * _EXP_FAR_PENALTY, 2))
     return fit, detail
 
 
@@ -151,10 +126,10 @@ def compute_match(
     related_map = related_skill_map()
 
     matched_req, related_req, missing_req, req_coverage = _score_axis(
-        owned, required, related_map, config.related_credit, skill_weights
+        owned, required, related_map, RELATED_CREDIT, skill_weights
     )
     matched_pref, related_pref, missing_pref, pref_coverage = _score_axis(
-        owned, preferred, related_map, config.related_credit, skill_weights
+        owned, preferred, related_map, RELATED_CREDIT, skill_weights
     )
 
     if not has_skill_data:
@@ -166,7 +141,7 @@ def compute_match(
         score = pref_coverage * 100
     else:
         score = (
-            req_coverage * config.required_weight + pref_coverage * config.preferred_weight
+            req_coverage * _REQUIRED_WEIGHT + pref_coverage * _PREFERRED_WEIGHT
         ) * 100
 
     exp_fit, exp_detail = (None, "")

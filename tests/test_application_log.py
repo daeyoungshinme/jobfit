@@ -1,7 +1,3 @@
-from datetime import date
-
-from types import SimpleNamespace
-
 from app.models import ApplicationEvent
 from app.services.application_log import (
     add_interview_event,
@@ -9,7 +5,6 @@ from app.services.application_log import (
     events_for_job,
     record_status_change,
     timeline,
-    upcoming_interviews,
 )
 
 
@@ -49,14 +44,3 @@ def test_timeline_renders_status_and_interview():
     assert entries[0].label == "관심 → 지원완료"
     assert entries[1].kind == "interview" and entries[1].at == "2026-09-20"
     assert entries[1].detail == "1차 기술"
-
-
-def test_upcoming_interviews_filters_past_and_sorts():
-    events = [
-        SimpleNamespace(job_id=1, kind="interview", event_at="2026-09-01"),
-        SimpleNamespace(job_id=2, kind="interview", event_at="2026-09-25"),
-        SimpleNamespace(job_id=3, kind="interview", event_at="2026-09-10"),
-        SimpleNamespace(job_id=4, kind="interview", event_at="망함"),
-    ]
-    result = upcoming_interviews(events, date(2026, 9, 7))
-    assert [e.job_id for e in result] == [3, 2]

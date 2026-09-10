@@ -3,6 +3,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from app.constants import MATCH_PREFERRED_WEIGHT, MATCH_REQUIRED_WEIGHT
+from app.enums import POSITION
 from app.models import JobPosting
 from app.schemas import MatchResult, SkillRank
 from app.services.experience import describe_bounds, parse_experience_bounds
@@ -22,17 +23,23 @@ _EXP_NEAR_YEARS = 2      # 이 이내로 벗어나면 "근접"
 _EXP_NEAR_FIT = 0.7      # 근접 시 적합도
 _EXP_FAR_PENALTY = 0.15  # 근접 범위를 넘어서면 초과 1년당 감점
 _EXP_MIN_FIT = 0.2       # 아무리 벗어나도 이 아래로는 안 내림
+# position_fit: 이력서 target_position vs 공고 position. 완전 일치 / 인접 직무
+# (POSITION meta "adjacent") / 그 외.
+_POSITION_EXACT_FIT = 1.0
+_POSITION_ADJACENT_FIT = 0.6
+_POSITION_FAR_FIT = 0.2
 
 
 @dataclass(frozen=True)
 class MatchConfig:
     """매칭 점수 계산 파라미터.
 
-    experience_weight 만 라우터가 바꾼다 — 기본 0 이라 경력축은 점수에 반영되지
-    않고(투명 노출만), dashboard 가 `?axes=1` 로 켤 때만 최종 점수에 섞인다.
-    필수/우대 가중·related 부분점수는 튜닝 상수(모듈 상단)로 고정."""
+    axes_weight 만 라우터가 바꾼다 — 기본 0 이라 경력·직무 적합도 축은 점수에
+    반영되지 않고(투명 노출만), dashboard 가 `?axes=1` 로 켤 때만 각 축이
+    `1 - axes_weight·(1 - fit)` 배율로 점수를 (독립적으로) 깎는다. 필수/우대
+    가중·related 부분점수는 튜닝 상수(모듈 상단)로 고정."""
 
-    experience_weight: float = 0.0
+    axes_weight: float = 0.0
 
 
 DEFAULT_CONFIG = MatchConfig()
@@ -111,6 +118,30 @@ def experience_fit(total_years: int, job_experience: str) -> tuple[float | None,
     return fit, detail
 
 
+def _positions_adjacent(a: str, b: str) -> bool:
+    """POSITION meta 의 "adjacent" 목록을 양방향으로 확인."""
+    member_a, member_b = POSITION.get(a), POSITION.get(b)
+    return bool(
+        (member_a and b in member_a.meta.get("adjacent", ()))
+        or (member_b and a in member_b.meta.get("adjacent", ()))
+    )
+
+
+def position_fit(resume_position: str, job_position: str) -> tuple[float | None, str]:
+    """(적합도 0~1, 설명 문자열). 한쪽이라도 없거나 '기타(other)'면 (None, "")."""
+    want = (resume_position or "").strip()
+    posting = (job_position or "").strip()
+    if not want or not posting or "other" in (want, posting):
+        return None, ""
+    want_label = POSITION.label_of(want)
+    posting_label = POSITION.label_of(posting)
+    if want == posting:
+        return _POSITION_EXACT_FIT, f"희망 {want_label} · 공고 {posting_label}"
+    if _positions_adjacent(want, posting):
+        return _POSITION_ADJACENT_FIT, f"희망 {want_label} · 공고 {posting_label} (인접 직무)"
+    return _POSITION_FAR_FIT, f"희망 {want_label} · 공고 {posting_label} (다른 직무)"
+
+
 def compute_match(
     resume_skills: list[str],
     job: JobPosting,
@@ -145,12 +176,20 @@ def compute_match(
         ) * 100
 
     exp_fit, exp_detail = (None, "")
+    pos_fit, pos_detail = (None, "")
     if resume is not None:
         exp_fit, exp_detail = experience_fit(
             getattr(resume, "total_years", 0) or 0, job.experience_level or ""
         )
-    if has_skill_data and exp_fit is not None and config.experience_weight > 0:
-        score = score * (1 - config.experience_weight) + exp_fit * 100 * config.experience_weight
+        pos_fit, pos_detail = position_fit(
+            getattr(resume, "target_position", "") or "", job.position or ""
+        )
+    # 부가 축(경력·직무)은 1.0 미만일 때만 점수를 깎는다 — 축별 독립 감점이라
+    # 완벽한 한 축이 다른 축의 미스핏을 가리지 않는다(평균이 아님).
+    if has_skill_data and config.axes_weight > 0:
+        for fit in (exp_fit, pos_fit):
+            if fit is not None:
+                score *= 1 - config.axes_weight * (1 - fit)
 
     return MatchResult(
         job_id=job.id,
@@ -169,6 +208,8 @@ def compute_match(
         related_preferred=related_pref,
         experience_fit=exp_fit,
         experience_detail=exp_detail,
+        position_fit=pos_fit,
+        position_detail=pos_detail,
     )
 
 

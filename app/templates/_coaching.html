@@ -18,6 +18,9 @@
   {% if match.experience_detail %}
   <p class="hint-inline">경력 적합도 {{ (match.experience_fit * 100)|round|int }}% <span class="meta">({{ match.experience_detail }})</span></p>
   {% endif %}
+  {% if match.position_detail %}
+  <p class="hint-inline">직무 적합도 {{ (match.position_fit * 100)|round|int }}% <span class="meta">({{ match.position_detail }})</span></p>
+  {% endif %}
 </div>
 {% endmacro %}
 

@@ -366,6 +366,37 @@ def test_add_interview_rejects_bad_date(client, job_factory):
     assert r.headers["location"] == f"/jobs/{job.id}?msg=job_application_invalid"
 
 
+def test_add_interview_success_records_event(client, db_session, job_factory):
+    from app.services.application_log import events_for_job
+
+    job = job_factory()
+    r = client.post(
+        f"/jobs/{job.id}/interview",
+        data={"event_at": "2026-12-01", "detail": "1차 기술 면접"},
+        follow_redirects=False,
+    )
+    assert r.headers["location"] == f"/jobs/{job.id}?msg=job_interview_added"
+    (event,) = events_for_job(db_session, job.id)
+    assert event.kind == "interview"
+    assert event.event_at == "2026-12-01"
+    assert event.detail == "1차 기술 면접"
+
+
+def test_add_interview_unknown_job_redirects(client):
+    r = client.post("/jobs/99999/interview", data={"event_at": "2026-12-01"}, follow_redirects=False)
+    assert r.headers["location"] == "/jobs?msg=job_not_found"
+
+
+def test_update_job_application_rejects_unknown_status(client, db_session, job_factory):
+    job = job_factory(status="interest")
+    r = client.post(
+        f"/jobs/{job.id}/application", data={"status": "이상한상태"}, follow_redirects=False
+    )
+    assert r.headers["location"] == f"/jobs/{job.id}?msg=job_status_invalid"
+    db_session.refresh(job)
+    assert job.status == "interest"
+
+
 def test_quick_status_update_missing_job_redirects(client):
     response = client.post("/jobs/99999/status", data={"status": "interview"}, follow_redirects=False)
     assert response.status_code == 303

@@ -246,9 +246,17 @@ def _run_data_migrations() -> None:
         _set_meta("enum_codes_migrated", "done")
     # v2 replaces three older passes (job_postings_backfilled /
     # sections_detected_backfilled / job_extras_backfilled) that each re-parsed
-    # raw_text; a DB carrying those old flags simply re-parses once more here.
+    # raw_text. A DB that already ran all three has nothing left to do, so just
+    # adopt the v2 flag — re-parsing would only churn updated_at (onupdate=_now)
+    # on rows whose fresh parse now differs from what's stored.
     if _get_meta("job_postings_reparsed_v2") != "done":
-        _reparse_all_job_postings()
+        _legacy_reparse_flags = (
+            "job_postings_backfilled",
+            "sections_detected_backfilled",
+            "job_extras_backfilled",
+        )
+        if not all(_get_meta(f) == "done" for f in _legacy_reparse_flags):
+            _reparse_all_job_postings()
         _set_meta("job_postings_reparsed_v2", "done")
     if _get_meta("job_updated_at_backfilled") != "done":
         _backfill_updated_at()

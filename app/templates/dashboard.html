@@ -53,10 +53,10 @@
   점수는 시장에서 드물게 요구되는 스킬의 미보유에 더 큰 감점을 줍니다.</p>
 {% set qs = "resume_id=" ~ selected_resume.id ~ ("&position=" ~ selected_position if selected_position else "") %}
 <p class="axes-toggle">
-  {% if axes_on %}<a href="?{{ qs }}" class="btn-secondary">경력 적합도 빼고 스킬 점수만 보기</a>
-  <span class="hint-inline">현재 경력 적합도를 점수에 반영 중</span>
-  {% else %}<a href="?{{ qs }}&axes=1" class="btn-secondary">경력 적합도까지 반영해 보기</a>
-  <span class="hint-inline">현재 스킬 점수만 표시 (경력 적합도는 참고용)</span>{% endif %}
+  {% if axes_on %}<a href="?{{ qs }}" class="btn-secondary">경력·직무 적합도 빼고 스킬 점수만 보기</a>
+  <span class="hint-inline">현재 경력·직무 적합도를 점수에 반영 중</span>
+  {% else %}<a href="?{{ qs }}&axes=1" class="btn-secondary">경력·직무 적합도까지 반영해 보기</a>
+  <span class="hint-inline">현재 스킬 점수만 표시 (경력·직무 적합도는 참고용)</span>{% endif %}
 </p>
 {% endif %}
 <div class="table-scroll">
@@ -71,6 +71,8 @@
       <td data-label="우선순위">{{ loop.index }}</td>
       <td data-label="공고">
         <a href="/jobs/{{ m.job_id }}">{{ m.job_title }}</a>
+        {% if m.position_fit == 1.0 %}<span class="tag tag-fit">직무 일치</span>
+        {% elif m.position_fit and m.position_fit >= 0.6 %}<span class="tag tag-fit">인접 직무</span>{% endif %}
         {% if m.source_site %}<span class="tag tag-source">{{ m.source_site }}</span>{% endif %}
         {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener" class="job-source-link">원본 ↗</a>{% endif %}
         <br><span class="meta">{{ m.company }}</span>
@@ -81,6 +83,7 @@
         {{ score_bar(m.score) }}
         {{ m.score }}점
         {% if m.experience_detail %}<br><span class="hint-inline">경력 {{ (m.experience_fit * 100)|round|int }}% · {{ m.experience_detail }}</span>{% endif %}
+        {% if m.position_detail %}<br><span class="hint-inline">직무 {{ (m.position_fit * 100)|round|int }}% · {{ m.position_detail }}</span>{% endif %}
         {% else %}
         <span class="hint-inline">{{ NO_SKILL_DATA }}</span>
         {% endif %}

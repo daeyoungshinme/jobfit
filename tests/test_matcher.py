@@ -5,6 +5,7 @@ from app.services.matcher import (
     MatchConfig,
     compute_match,
     experience_fit,
+    position_fit,
     rank_matches,
     scarcity_weights,
     skill_ranking,
@@ -120,7 +121,7 @@ def test_experience_fit_in_range_near_and_far():
     assert experience_fit(3, "협의")[0] is None           # 해석 불가 자유 텍스트
 
 
-def test_experience_weight_zero_keeps_score_unchanged(make_job):
+def test_axes_weight_zero_keeps_score_unchanged(make_job):
     job = make_job(1, "공고", ["Python"], [])
     job.experience_level = "y5_10"
     resume = SimpleNamespace(total_years=1)
@@ -130,13 +131,40 @@ def test_experience_weight_zero_keeps_score_unchanged(make_job):
     assert "요구 5~10년" in r.experience_detail
 
 
-def test_experience_weight_folds_axis_into_score(make_job):
+def test_axes_weight_folds_experience_into_score(make_job):
     job = make_job(1, "공고", ["Python"], [])
     job.experience_level = "y5_10"
     resume = SimpleNamespace(total_years=1)
-    cfg = MatchConfig(experience_weight=0.25)
+    cfg = MatchConfig(axes_weight=0.25)
     r = compute_match(["Python"], job, resume=resume, config=cfg)
     assert r.score < 100.0  # 경력 미달이 점수를 끌어내린다
+
+
+def test_position_fit_exact_adjacent_and_far():
+    assert position_fit("backend", "backend")[0] == 1.0
+    assert position_fit("backend", "fullstack")[0] == 0.6   # 인접(POSITION meta)
+    assert position_fit("fullstack", "backend")[0] == 0.6   # 양방향
+    assert position_fit("backend", "frontend")[0] == 0.2    # 다른 직무
+    assert position_fit("", "backend") == (None, "")        # 이력서 미설정
+    assert position_fit("backend", "") == (None, "")        # 공고 미상
+    assert position_fit("other", "backend") == (None, "")   # '기타'는 축 제외
+    detail = position_fit("backend", "fullstack")[1]
+    assert "인접 직무" in detail
+
+
+def test_axes_weight_blends_experience_and_position_mean(make_job):
+    job = make_job(1, "공고", ["Python"], [], position="frontend")
+    job.experience_level = "y5_10"
+    resume = SimpleNamespace(total_years=1, target_position="backend")  # 경력 미달 + 다른 직무
+
+    transparent = compute_match(["Python"], job, resume=resume)
+    assert transparent.score == 100.0
+    assert transparent.position_fit == 0.2
+    assert transparent.experience_fit is not None
+
+    folded = compute_match(["Python"], job, resume=resume, config=MatchConfig(axes_weight=0.25))
+    # score = 100*0.75 + mean(exp_fit, 0.2)*100*0.25 < 100
+    assert folded.score < transparent.score
 
 
 def test_skill_ranking_counts_and_percentage(make_job):

@@ -49,8 +49,27 @@ def test_dashboard_axes_1_folds_experience_into_score(client, job_factory, resum
     with_axes = client.get("/analysis/dashboard", params={"resume_id": resume.id, "axes": 1})
 
     assert with_axes.status_code == 200
-    assert "경력 적합도를 점수에 반영 중" in with_axes.text
-    assert "경력 적합도를 점수에 반영 중" not in baseline.text
+    assert "적합도를 점수에 반영 중" in with_axes.text
+    assert "적합도를 점수에 반영 중" not in baseline.text
+
+
+def test_dashboard_shows_position_match_badge(client, job_factory, resume_factory):
+    job_factory(title="백엔드 자리", position="backend", required_skills=["Python"])
+    resume = resume_factory(extracted_skills=["Python"], target_position="backend")
+
+    response = client.get("/analysis/dashboard", params={"resume_id": resume.id})
+    assert response.status_code == 200
+    assert "직무 일치" in response.text
+    assert "희망 백엔드 개발자 · 공고 백엔드 개발자" in response.text
+
+
+def test_dashboard_no_position_badge_when_resume_target_unset(client, job_factory, resume_factory):
+    job_factory(position="backend", required_skills=["Python"])
+    resume = resume_factory(extracted_skills=["Python"])  # target_position 기본 ""
+
+    response = client.get("/analysis/dashboard", params={"resume_id": resume.id})
+    assert "직무 일치" not in response.text
+    assert "인접 직무" not in response.text
 
 
 def test_activity_page_renders(client, job_factory):

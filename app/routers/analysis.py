@@ -40,9 +40,9 @@ def dashboard(
     if resume_id:
         selected_resume = db.get(Resume, resume_id)
         if selected_resume:
-            # 희소 스킬 미보유에 더 큰 감점을 주고, ?axes=1 이면 경력 적합도 축을
-            # 최종 점수에 섞는다 (기본값은 투명 노출만).
-            config = MatchConfig(experience_weight=0.25) if axes else MatchConfig()
+            # 희소 스킬 미보유에 더 큰 감점을 주고, ?axes=1 이면 경력·직무 적합도
+            # 축을 최종 점수에 섞는다 (기본값은 투명 노출만).
+            config = MatchConfig(axes_weight=0.25) if axes else MatchConfig()
             matches = rank_matches(
                 selected_resume.extracted_skills or [], jobs,
                 config=config,

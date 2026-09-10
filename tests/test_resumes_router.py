@@ -78,6 +78,8 @@ def test_resume_detail_renders_review_checklist(client, resume_factory):
     response = client.get(f"/resumes/{resume.id}")
     assert response.status_code == 200
     assert resume.label in response.text
+    # review_resume() 결과가 실제로 렌더된다 — 5자짜리 원문이면 "분량이 짧습니다" 경고.
+    assert "이력서 분량이 짧습니다" in response.text
 
 
 def test_submit_resume_form_missing_label_returns_422(client):

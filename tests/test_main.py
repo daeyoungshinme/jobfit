@@ -77,22 +77,20 @@ def test_lifespan_runs_init_db(monkeypatch):
     assert calls == [True]
 
 
-def test_unhandled_exception_renders_500_page_for_browsers(error_routes):
-    lenient = TestClient(app, raise_server_exceptions=False)
-    response = lenient.get("/_test/unhandled", headers={"accept": "text/html"})
+def test_unhandled_exception_renders_500_page_for_browsers(error_routes, lenient_client):
+    response = lenient_client.get("/_test/unhandled", headers={"accept": "text/html"})
     assert response.status_code == 500
     assert "text/html" in response.headers["content-type"]
 
 
-def test_unhandled_exception_is_plain_500_for_non_browsers(error_routes):
-    lenient = TestClient(app, raise_server_exceptions=False)
-    response = lenient.get("/_test/unhandled", headers={"accept": "application/json"})
+def test_unhandled_exception_is_plain_500_for_non_browsers(error_routes, lenient_client):
+    response = lenient_client.get("/_test/unhandled", headers={"accept": "application/json"})
     assert response.status_code == 500
     assert response.text == "Internal Server Error"
 
 
-def test_server_http_exception_renders_500_page_for_browsers(error_routes):
-    response = TestClient(app).get("/_test/server-http", headers={"accept": "text/html"})
+def test_server_http_exception_renders_500_page_for_browsers(error_routes, client):
+    response = client.get("/_test/server-http", headers={"accept": "text/html"})
     assert response.status_code == 503
     assert "text/html" in response.headers["content-type"]
 

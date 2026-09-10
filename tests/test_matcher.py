@@ -152,7 +152,7 @@ def test_position_fit_exact_adjacent_and_far():
     assert "인접 직무" in detail
 
 
-def test_axes_weight_blends_experience_and_position_mean(make_job):
+def test_axes_weight_penalizes_each_axis_independently(make_job):
     job = make_job(1, "공고", ["Python"], [], position="frontend")
     job.experience_level = "y5_10"
     resume = SimpleNamespace(total_years=1, target_position="backend")  # 경력 미달 + 다른 직무
@@ -163,8 +163,24 @@ def test_axes_weight_blends_experience_and_position_mean(make_job):
     assert transparent.experience_fit is not None
 
     folded = compute_match(["Python"], job, resume=resume, config=MatchConfig(axes_weight=0.25))
-    # score = 100*0.75 + mean(exp_fit, 0.2)*100*0.25 < 100
-    assert folded.score < transparent.score
+    # 두 축이 독립적으로 곱셈 감점: 100 * (1-0.25*(1-exp)) * (1-0.25*0.8)
+    exp = transparent.experience_fit
+    expected = 100 * (1 - 0.25 * (1 - exp)) * (1 - 0.25 * (1 - 0.2))
+    assert folded.score == round(expected, 1)
+
+
+def test_axes_weight_perfect_position_does_not_mask_experience_gap(make_job):
+    """직무가 완벽히 일치해도 경력 미달 감점이 희석되지 않아야 한다(평균 아님)."""
+    job = make_job(1, "공고", ["Python"], [], position="backend")
+    job.experience_level = "y5_10"
+    resume_match = SimpleNamespace(total_years=1, target_position="backend")   # 직무 일치
+    resume_nopos = SimpleNamespace(total_years=1)                              # 직무축 없음
+    cfg = MatchConfig(axes_weight=0.25)
+
+    assert (
+        compute_match(["Python"], job, resume=resume_match, config=cfg).score
+        == compute_match(["Python"], job, resume=resume_nopos, config=cfg).score
+    )
 
 
 def test_skill_ranking_counts_and_percentage(make_job):

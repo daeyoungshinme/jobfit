@@ -35,9 +35,9 @@ class MatchConfig:
     """매칭 점수 계산 파라미터.
 
     axes_weight 만 라우터가 바꾼다 — 기본 0 이라 경력·직무 적합도 축은 점수에
-    반영되지 않고(투명 노출만), dashboard 가 `?axes=1` 로 켤 때만 최종 점수에
-    섞인다(두 축이 모두 있으면 둘의 평균을 이 가중치로). 필수/우대 가중·
-    related 부분점수는 튜닝 상수(모듈 상단)로 고정."""
+    반영되지 않고(투명 노출만), dashboard 가 `?axes=1` 로 켤 때만 각 축이
+    `1 - axes_weight·(1 - fit)` 배율로 점수를 (독립적으로) 깎는다. 필수/우대
+    가중·related 부분점수는 튜닝 상수(모듈 상단)로 고정."""
 
     axes_weight: float = 0.0
 
@@ -184,10 +184,12 @@ def compute_match(
         pos_fit, pos_detail = position_fit(
             getattr(resume, "target_position", "") or "", job.position or ""
         )
-    extra_axes = [f for f in (exp_fit, pos_fit) if f is not None]
-    if has_skill_data and extra_axes and config.axes_weight > 0:
-        axes_mean = sum(extra_axes) / len(extra_axes)
-        score = score * (1 - config.axes_weight) + axes_mean * 100 * config.axes_weight
+    # 부가 축(경력·직무)은 1.0 미만일 때만 점수를 깎는다 — 축별 독립 감점이라
+    # 완벽한 한 축이 다른 축의 미스핏을 가리지 않는다(평균이 아님).
+    if has_skill_data and config.axes_weight > 0:
+        for fit in (exp_fit, pos_fit):
+            if fit is not None:
+                score *= 1 - config.axes_weight * (1 - fit)
 
     return MatchResult(
         job_id=job.id,

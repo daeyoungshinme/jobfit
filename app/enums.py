@@ -95,8 +95,9 @@ EXPERIENCE_LEVEL = EnumSet([
 # terms: 제목·본문에서 직무를 추측할 때 찾는 키워드. 더 구체적인 라벨(풀스택)이
 # 일반 라벨(백엔드/프론트엔드)보다 먼저 오도록 정렬돼 있다.
 # adjacent: 직무 적합도(matcher.position_fit) 축에서 "완전히 다른 직무"보다는
-# 가까운 것으로 볼 인접 직무 코드. matcher._positions_adjacent 가 양방향으로
-# 확인하므로 한쪽에만 적어도 되지만, 가독성을 위해 양쪽에 대칭으로 둔다.
+# 가까운 것으로 볼 인접 직무 코드. 여기서는 가독성을 위해 양쪽에 대칭으로
+# 적지만, matcher._positions_adjacent 가 양방향으로 확인하므로 한쪽만 적어도
+# (또는 한쪽이 빠져도) 동작한다 — 대칭이 강제는 아니다.
 POSITION = EnumSet([
     EnumMember("fullstack", "풀스택 개발자", meta={"terms": ("풀스택",), "adjacent": ("backend", "frontend")}),
     EnumMember("android", "안드로이드 개발자", meta={"terms": ("안드로이드", "android"), "adjacent": ("ios",)}),

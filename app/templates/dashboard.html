@@ -71,8 +71,10 @@
       <td data-label="우선순위">{{ loop.index }}</td>
       <td data-label="공고">
         <a href="/jobs/{{ m.job_id }}">{{ m.job_title }}</a>
+        {% if m.has_skill_data %}
         {% if m.position_fit == 1.0 %}<span class="tag tag-fit">직무 일치</span>
         {% elif m.position_fit and m.position_fit >= 0.6 %}<span class="tag tag-fit">인접 직무</span>{% endif %}
+        {% endif %}
         {% if m.source_site %}<span class="tag tag-source">{{ m.source_site }}</span>{% endif %}
         {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener" class="job-source-link">원본 ↗</a>{% endif %}
         <br><span class="meta">{{ m.company }}</span>

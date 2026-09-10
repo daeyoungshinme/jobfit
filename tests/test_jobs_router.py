@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.models import JobPosting, Resume
+from app.models import JobPosting
 
 
 def test_job_detail_404_when_missing(client):
@@ -397,13 +397,9 @@ def test_update_job_validation_error_keeps_submitted_values(client, db_session, 
     assert job.title == "원래 제목"  # nothing persisted
 
 
-def test_update_job_application_saves_all_fields(client, db_session):
-    resume = Resume(label="지원용 이력서", source_type="form", raw_text="x", extracted_skills=[])
-    job = JobPosting(title="공고", position="backend", raw_text="x", status="interest")
-    db_session.add_all([resume, job])
-    db_session.commit()
-    db_session.refresh(resume)
-    db_session.refresh(job)
+def test_update_job_application_saves_all_fields(client, db_session, job_factory, resume_factory):
+    resume = resume_factory(label="지원용 이력서", raw_text="x", extracted_skills=[])
+    job = job_factory(title="공고", raw_text="x", status="interest")
 
     response = client.post(
         f"/jobs/{job.id}/application",
@@ -426,11 +422,8 @@ def test_update_job_application_saves_all_fields(client, db_session):
     assert job.memo == "리크루터 김OO"
 
 
-def test_update_job_application_rejects_unknown_channel(client, db_session):
-    job = JobPosting(title="공고", position="backend", raw_text="x", status="interest")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_application_rejects_unknown_channel(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", status="interest")
 
     response = client.post(
         f"/jobs/{job.id}/application", data={"applied_via": "이상한채널"}, follow_redirects=False
@@ -440,11 +433,8 @@ def test_update_job_application_rejects_unknown_channel(client, db_session):
     assert job.applied_via == ""
 
 
-def test_update_job_application_rejects_bad_date(client, db_session):
-    job = JobPosting(title="공고", position="backend", raw_text="x", status="interest")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_application_rejects_bad_date(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", status="interest")
 
     response = client.post(
         f"/jobs/{job.id}/application", data={"applied_at": "2026/01/01"}, follow_redirects=False
@@ -457,11 +447,8 @@ def test_update_job_application_unknown_job(client):
     assert response.headers["location"] == "/jobs?msg=job_not_found"
 
 
-def test_update_job_application_stamps_today_for_applied(client, db_session):
-    job = JobPosting(title="공고", position="backend", raw_text="x", status="interest")
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_update_job_application_stamps_today_for_applied(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", status="interest")
 
     client.post(
         f"/jobs/{job.id}/application", data={"status": "applied"}, follow_redirects=False
@@ -470,26 +457,16 @@ def test_update_job_application_stamps_today_for_applied(client, db_session):
     assert job.applied_at == date.today().isoformat()
 
 
-def test_job_detail_suggests_channel_from_source_site(client, db_session):
-    job = JobPosting(
-        title="공고", position="backend", raw_text="x", source_site="원티드"
-    )
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_job_detail_suggests_channel_from_source_site(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", source_site="원티드")
 
     response = client.get(f"/jobs/{job.id}")
     assert response.status_code == 200
     assert '<option value="wanted" selected>원티드</option>' in response.text
 
 
-def test_job_detail_handles_deleted_applied_resume(client, db_session):
-    job = JobPosting(
-        title="공고", position="backend", raw_text="x", applied_resume_id=999
-    )
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_job_detail_handles_deleted_applied_resume(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="x", applied_resume_id=999)
 
     response = client.get(f"/jobs/{job.id}")
     assert response.status_code == 200
@@ -521,13 +498,8 @@ def test_create_job_without_inbound_defaults_false(client, db_session):
     assert job.is_inbound is False
 
 
-def test_edit_job_can_turn_inbound_off(client, db_session):
-    job = JobPosting(
-        title="공고", position="backend", raw_text="자격요건\nPython", is_inbound=True
-    )
-    db_session.add(job)
-    db_session.commit()
-    db_session.refresh(job)
+def test_edit_job_can_turn_inbound_off(client, db_session, job_factory):
+    job = job_factory(title="공고", raw_text="자격요건\nPython", is_inbound=True)
 
     client.post(
         f"/jobs/{job.id}/edit",

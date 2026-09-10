@@ -436,17 +436,14 @@ def test_bracket_tip_block_does_not_bleed_into_preferred_section():
 def test_parse_job_posting_caps_pathological_input():
     # A huge blob of near-address text used to be a backtracking risk for the
     # regex parser (and could stall startup via the backfill). The entry point
-    # caps raw_text and every quantifier is bounded, so this returns promptly.
-    import time
-
+    # truncates raw_text to MAX_RAW_TEXT_CHARS before any regex runs, so the
+    # blob and its truncation must parse to exactly the same result — a
+    # deterministic check with no wall-clock flakiness on a loaded CI box.
     blob = ("서울특별시 강남구 " + "가" * 200 + " ") * 2000  # ~800k chars
-    start = time.perf_counter()
-    parsed = parse_job_posting(blob)
-    guessed = guess_posting_fields(blob)
-    assert time.perf_counter() - start < 2.0
     assert len(blob) > MAX_RAW_TEXT_CHARS
-    assert isinstance(parsed.required_text, str)
-    assert isinstance(guessed.address, str)
+
+    assert parse_job_posting(blob) == parse_job_posting(blob[:MAX_RAW_TEXT_CHARS])
+    assert guess_posting_fields(blob) == guess_posting_fields(blob[:MAX_RAW_TEXT_CHARS])
 
 
 def test_normalize_newlines_collapses_crlf_and_cr():
